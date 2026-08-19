@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+    <title>Crime Tablet</title>
+</head>
+<body>
+    <div id="app" class="hidden">
+        <div class="tablet">
+            <div class="bezel">
+                <div class="cam"></div>
+                <div class="screen">
+                    <header class="topbar">
+                        <div class="brand">
+                            <span class="dot"></span>
+                            <div>
+                                <p class="os">CONTRACT TABLET</p>
+                                <h1 id="greeting">Operator</h1>
+                            </div>
+                        </div>
+                        <div class="stats">
+                            <div class="chip">
+                                <span>Your cooldown</span>
+                                <strong id="playerCooldown">Ready</strong>
+                            </div>
+                            <button id="closeBtn" class="icon-btn" title="Close">✕</button>
+                        </div>
+                    </header>
+
+                    <nav class="tabs" id="typeTabs"></nav>
+
+                    <main>
+                        <section class="list-pane">
+                            <div class="list-head">
+                                <h2 id="listTitle">Select a contract</h2>
+                                <p id="listSub">Pick a job type, then form a crew.</p>
+                            </div>
+                            <div id="locationList" class="cards"></div>
+                        </section>
+
+                        <aside class="crew-pane" id="crewPane">
+                            <h2>Crew</h2>
+                            <p class="muted" id="crewEmpty">Create a crew from a contract to invite nearby players.</p>
+                            <div id="crewBody" class="hidden">
+                                <p class="contract-name" id="crewContract"></p>
+                                <p class="slots" id="crewSlots"></p>
+                                <ul id="memberList"></ul>
+                                <div class="actions">
+                                    <button id="inviteBtn" class="btn ghost">Invite nearby</button>
+                                    <button id="startBtn" class="btn primary">Start contract</button>
+                                    <button id="leaveBtn" class="btn danger">Leave crew</button>
+                                </div>
+                            </div>
+                            <div id="nearbyList" class="nearby hidden"></div>
+                        </aside>
+                    </main>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
