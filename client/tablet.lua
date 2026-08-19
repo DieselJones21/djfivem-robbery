@@ -19,11 +19,14 @@ local function failReason(data)
     if data.reason == 'on_cooldown' then
         return locale('on_cooldown', data.arg1 or '?')
     end
+    if data.reason == 'player_cooldown' then
+        return locale('player_cooldown', data.arg1 or 'You', data.arg2 or '?')
+    end
     if data.reason == 'min_players' then
         return locale('min_players', data.arg1 or 1)
     end
     if data.reason == 'missing_item' then
-        return locale('missing_item', data.item or data.arg1 or 'item')
+        return locale('missing_kit', data.item or data.arg1 or 'item')
     end
     return locale(data.reason)
 end

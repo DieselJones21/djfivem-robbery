@@ -3,7 +3,7 @@ const typeTabs = document.getElementById('typeTabs');
 const locationList = document.getElementById('locationList');
 const listTitle = document.getElementById('listTitle');
 const listSub = document.getElementById('listSub');
-const policeCount = document.getElementById('policeCount');
+const playerCooldown = document.getElementById('playerCooldown');
 const greeting = document.getElementById('greeting');
 const crewEmpty = document.getElementById('crewEmpty');
 const crewBody = document.getElementById('crewBody');
@@ -31,7 +31,13 @@ function nui(name, data = {}) {
     }).then((res) => res.json()).catch(() => ({ ok: false }));
 }
 
+function itemList(items) {
+    if (!items || !items.length) return 'No tools';
+    return items.map((item) => item.label || item.item || item).join(', ');
+}
+
 function formatCooldown(seconds) {
+    seconds = Math.max(0, Math.floor(seconds || 0));
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
@@ -67,12 +73,14 @@ function renderLocations() {
     const rows = state.locations.filter((l) => l.type === state.selectedType);
     listTitle.textContent = type ? type.label : 'Contracts';
     listSub.textContent = type
-        ? `${type.description} Max crew ${type.maxPlayers}. Police needed ${type.minPolice}+.`
+        ? `${type.description} Max crew ${type.maxPlayers}. Tools: ${itemList(type.requiredItemLabels || type.requiredItems)}. Location cooldown ${formatCooldown(type.cooldown)}. No cops required.`
         : 'Select a job type.';
 
     locationList.innerHTML = rows.map((loc) => {
         const selected = state.selectedLocation === loc.id ? 'selected' : '';
-        const ready = loc.available && state.police >= loc.minPolice;
+        const onCd = (loc.cooldown || 0) > 0;
+        const ready = !onCd && (state.playerCooldown || 0) <= 0;
+        const itemTags = (loc.requiredItems || []).map((item) => `<span class="tag">${item.label}</span>`).join('');
         return `
             <article class="card ${selected}" data-id="${loc.id}">
                 <h3>${loc.label}</h3>
@@ -80,10 +88,11 @@ function renderLocations() {
                 <div class="meta">
                     <span class="tag">${loc.payoutLabel}</span>
                     <span class="tag">${loc.maxPlayers} players</span>
-                    <span class="tag">${loc.minPolice} police</span>
+                    <span class="tag">${formatCooldown(loc.cooldownDuration)} cooldown</span>
+                    ${itemTags}
                     ${ready
                         ? '<span class="tag ok">Ready</span>'
-                        : `<span class="tag down">${loc.available ? 'Need police' : 'Cooldown ' + formatCooldown(loc.cooldown)}</span>`}
+                        : `<span class="tag down">${onCd ? 'Location CD ' + formatCooldown(loc.cooldown) : 'Personal CD ' + formatCooldown(state.playerCooldown)}</span>`}
                 </div>
             </article>
         `;
@@ -114,7 +123,8 @@ function renderCrew() {
     const loc = locationById(crew.locationId);
     const type = loc && typeById(loc.type);
     crewContract.textContent = loc ? loc.label : crew.locationId;
-    crewSlots.textContent = `${crew.members.length} / ${crew.maxPlayers} operators`;
+    const tools = loc ? itemList(loc.requiredItems) : '';
+    crewSlots.textContent = `${crew.members.length} / ${crew.maxPlayers} operators${tools ? ' · Bring: ' + tools : ''}`;
     memberList.innerHTML = crew.members.map((m) => `
         <li>
             <span>${m.name}</span>
@@ -129,7 +139,9 @@ function renderCrew() {
 
 function render() {
     greeting.textContent = state.name || 'Operator';
-    policeCount.textContent = String(state.police ?? 0);
+    playerCooldown.textContent = (state.playerCooldown || 0) > 0
+        ? formatCooldown(state.playerCooldown)
+        : 'Ready';
     renderTabs();
     renderLocations();
     renderCrew();

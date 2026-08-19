@@ -20,6 +20,13 @@ return {
     },
 
     -- Optional extras if your server does not already have them
+    ['lockpick'] = {
+        label = 'Lockpick',
+        weight = 160,
+        stack = true,
+        close = true,
+        description = 'Opens store registers and stolen cars.',
+    },
     ['electronickit'] = {
         label = 'Electronic Kit',
         weight = 300,

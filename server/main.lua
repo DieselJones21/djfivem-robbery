@@ -8,21 +8,33 @@ lib.callback.register('djfivem-robbery:server:tabletData', function(source)
         return { ok = false, reason = 'police_blocked' }
     end
 
+    local playerCd = PlayerCooldownRemaining(source)
     local locations = {}
     for i = 1, #Config.Locations do
         local loc = Config.Locations[i]
         local typeCfg = Config.Types[loc.type]
         local remaining = CooldownRemaining(loc.id)
+        local items = {}
+        local required = GetRequiredItems(loc)
+        for n = 1, #required do
+            items[#items + 1] = {
+                name = required[n].item,
+                count = required[n].count or 1,
+                label = ItemLabel(required[n].item),
+            }
+        end
         locations[#locations + 1] = {
             id = loc.id,
             type = loc.type,
             label = loc.label,
             description = loc.description,
             payoutLabel = loc.payoutLabel,
-            minPolice = loc.minPolice or typeCfg.minPolice,
+            minPolice = loc.minPolice or typeCfg.minPolice or 0,
             maxPlayers = typeCfg.maxPlayers,
             cooldown = remaining,
-            available = remaining <= 0,
+            cooldownDuration = GetLocationCooldown(loc),
+            requiredItems = items,
+            available = remaining <= 0 and playerCd <= 0,
             coords = Vec(loc.coords),
         }
     end
@@ -36,6 +48,17 @@ lib.callback.register('djfivem-robbery:server:tabletData', function(source)
             maxPlayers = cfg.maxPlayers,
             minPlayers = cfg.minPlayers,
             minPolice = cfg.minPolice,
+            cooldown = cfg.cooldown,
+            requiredItems = cfg.requiredItems,
+            requiredItemLabels = (function()
+                local labels = {}
+                if cfg.requiredItems then
+                    for n = 1, #cfg.requiredItems do
+                        labels[#labels + 1] = ItemLabel(cfg.requiredItems[n].item)
+                    end
+                end
+                return labels
+            end)(),
             icon = cfg.icon,
             color = cfg.color,
         }
@@ -48,6 +71,7 @@ lib.callback.register('djfivem-robbery:server:tabletData', function(source)
     return {
         ok = true,
         police = CountPolice(),
+        playerCooldown = playerCd,
         types = types,
         locations = locations,
         crew = SerializeCrew(crew),

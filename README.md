@@ -64,18 +64,31 @@ ensure djfivem-robbery
 1. Use the crime tablet from inventory.
 2. Pick a job type, then a location. That creates a crew.
 3. **Invite nearby** players (within 8m). They get an ox_lib prompt.
-4. **Start contract** when police count, cooldown, and crew size are valid.
+4. **Start contract** when the crew has the required tools and the location is not on cooldown.
 5. GPS is set. Use ox_target at the objective.
 6. ox_lib skill checks + progress bars handle hacking, lockpicking, thermite, drilling, and looting.
-7. Police get a blip/alert on the first noisy action.
+7. Police still get a blip/alert on the first noisy action (no cops need to be on duty to start).
 
-Required tools (configurable in `shared/config.lua`):
+## Required items
 
-- Banks: `electronickit`, `thermite`
-- Stores: `lockpick`, `drill`
-- ATMs: `drill`
-- Vehicles: `lockpick`
-- Ammunation: `electronickit`, `crowbar`, `drill`
+Someone in the crew must be holding the kit before the contract will start. The player who uses a tool still needs that item in their inventory.
+
+| Job | Tools | Why |
+| --- | --- | --- |
+| ATM | `drill` | Open the cassette |
+| Store | `lockpick`, `drill` | Tills, then the office safe |
+| Vehicle | `lockpick` | Unlock the target car |
+| Money truck | `thermite` | Burn the armored rear doors |
+| Bank | `electronickit`, `thermite` | Hack the keypad, then the vault |
+| Ammunation | `electronickit`, `crowbar`, `drill` | Cameras, display cases, gun locker |
+
+## Cooldowns
+
+- **Location cooldown** starts when the contract starts (not when it ends).
+- **Player cooldown** is 5 minutes after you start any contract.
+- Defaults: ATM 15m, vehicle 20m, store 25m, Ammunation 40m, bank/truck 45m, Paleto 60m.
+
+No police are required (`minPolice = 0`). Raise it later in `shared/config.lua` if you want.
 
 Payouts default to the `black_money` item. If that item is missing, cash is granted instead.
 
@@ -84,7 +97,8 @@ Payouts default to the `black_money` item. If that item is missing, cash is gran
 `shared/config.lua`
 
 - `PoliceJobs` and `RequireOnDuty`
-- `Types.*.maxPlayers` / `minPolice`
+- `Types.*.maxPlayers`, `minPolice` (default **0**), `cooldown`, `requiredItems`
+- `PlayerCooldown` (default 5 minutes)
 - `Items` names to match your inventory
 - `RewardMode` = `looter` or `split`
 - `Dispatch.resource` = `builtin` (default), `ps-dispatch`, `cd_dispatch`, `qs-dispatch`, or `custom`
@@ -111,7 +125,7 @@ For ps-dispatch / cd_dispatch / qs-dispatch, set `Config.Dispatch.resource` to t
 ## Notes
 
 - On-duty police cannot open the tablet or join a crew.
-- A location goes on cooldown when the contract **starts**, not when it finishes.
+- A location goes on cooldown when the contract **starts**, not when it finishes. `/robberyreset all` clears location and personal cooldowns.
 - Bank vault doors rotate on the vanilla `v_ilev_gb_vauldr` / Paleto vault model. Doorlock resources are not required.
 - Money trucks spawn a Stockade with two armed guards. Kill or stop the truck, then loot the rear crates.
 - Vehicle jobs lockpick at the spawn, then deliver to the marked drop-off.

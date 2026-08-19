@@ -18,6 +18,9 @@ Config.InteractDistance = 3.25
 Config.JobTimeout = 20 * 60 -- seconds after start
 Config.FailIfCrewWiped = true
 
+-- Personal cooldown after starting any contract (0 disables)
+Config.PlayerCooldown = 5 * 60
+
 -- Who receives loot: 'looter' (player who grabs it) or 'split' (evenly among crew)
 Config.RewardMode = 'looter'
 
@@ -29,57 +32,85 @@ Config.Tablet = {
 Config.Types = {
     bank = {
         label = 'Bank Heists',
-        description = 'Hack the keypad, breach the vault, empty the boxes.',
+        description = 'Hack the keypad, burn the vault, empty the boxes.',
         maxPlayers = 4,
         minPlayers = 1,
-        minPolice = 3,
+        minPolice = 0,
+        cooldown = 45 * 60,
         icon = 'university',
         color = '#7dd3fc',
+        requiredItems = {
+            { item = 'electronickit', count = 1 }, -- keypad hack
+            { item = 'thermite', count = 1 }, -- vault door
+        },
     },
     store = {
         label = 'Store Robberies',
-        description = 'Hit the register, then crack the back-room safe.',
+        description = 'Lockpick the till, then drill the back-room safe.',
         maxPlayers = 4,
         minPlayers = 1,
-        minPolice = 2,
+        minPolice = 0,
+        cooldown = 25 * 60,
         icon = 'store',
         color = '#86efac',
+        requiredItems = {
+            { item = 'lockpick', count = 1 }, -- cash registers
+            { item = 'drill', count = 1 }, -- office safe
+        },
     },
     atm = {
         label = 'ATM Jobs',
         description = 'Drill a street ATM and grab the cassette.',
         maxPlayers = 2,
         minPlayers = 1,
-        minPolice = 1,
+        minPolice = 0,
+        cooldown = 15 * 60,
         icon = 'credit-card',
         color = '#fde047',
+        requiredItems = {
+            { item = 'drill', count = 1 },
+        },
     },
     vehicle = {
         label = 'Vehicle Robberies',
-        description = 'Boost a marked car and drop it at the chop shop.',
+        description = 'Lockpick a marked car and drop it at the chop shop.',
         maxPlayers = 2,
         minPlayers = 1,
-        minPolice = 1,
+        minPolice = 0,
+        cooldown = 20 * 60,
         icon = 'car',
         color = '#fda4af',
+        requiredItems = {
+            { item = 'lockpick', count = 1 },
+        },
     },
     moneytruck = {
         label = 'Money Trucks',
-        description = 'Stop an armored truck, drop the guards, loot the rear.',
+        description = 'Stop the truck, then thermite the armored rear doors.',
         maxPlayers = 4,
         minPlayers = 1,
-        minPolice = 3,
+        minPolice = 0,
+        cooldown = 45 * 60,
         icon = 'truck',
         color = '#fdba74',
+        requiredItems = {
+            { item = 'thermite', count = 1 }, -- armored doors
+        },
     },
     ammunation = {
         label = 'Ammunation Hits',
-        description = 'Bypass security, smash cases, drill the gun locker.',
+        description = 'Hack cameras, smash cases, drill the gun locker.',
         maxPlayers = 4,
         minPlayers = 1,
-        minPolice = 2,
+        minPolice = 0,
+        cooldown = 40 * 60,
         icon = 'gun',
         color = '#d8b4fe',
+        requiredItems = {
+            { item = 'electronickit', count = 1 }, -- store security
+            { item = 'crowbar', count = 1 }, -- display cases
+            { item = 'drill', count = 1 }, -- weapon locker
+        },
     },
 }
 

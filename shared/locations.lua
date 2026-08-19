@@ -76,8 +76,9 @@ local function bankJob(opts)
         description = 'Crew up, hack the panel, burn the vault, then split the boxes.',
         coords = opts.gps,
         heading = opts.heading or 0.0,
-        cooldown = opts.cooldown or 75 * 60,
+        cooldown = opts.cooldown or Config.Types.bank.cooldown,
         minPolice = opts.minPolice or Config.Types.bank.minPolice,
+        requiredItems = Config.Types.bank.requiredItems,
         payoutLabel = opts.payoutLabel,
         vaultDoor = opts.vaultDoor,
         interactions = interactions,
@@ -124,8 +125,9 @@ local function storeJob(opts)
         label = opts.label,
         description = 'Clean the till, then drill the office safe.',
         coords = opts.gps,
-        cooldown = opts.cooldown or 35 * 60,
+        cooldown = opts.cooldown or Config.Types.store.cooldown,
         minPolice = Config.Types.store.minPolice,
+        requiredItems = Config.Types.store.requiredItems,
         payoutLabel = opts.payoutLabel or '$2,500 – $6,500',
         interactions = interactions,
     }
@@ -138,8 +140,9 @@ local function atmJob(opts)
         label = opts.label,
         description = 'Drill the cassette and grab the cash before patrols roll up.',
         coords = opts.coords,
-        cooldown = 25 * 60,
+        cooldown = Config.Types.atm.cooldown,
         minPolice = Config.Types.atm.minPolice,
+        requiredItems = Config.Types.atm.requiredItems,
         payoutLabel = '$1,200 – $2,400',
         interactions = {
             {
@@ -224,8 +227,9 @@ local function ammuJob(opts)
         label = opts.label,
         description = 'Kill the cameras, smash the cases, drill the back locker.',
         coords = opts.gps,
-        cooldown = 50 * 60,
+        cooldown = Config.Types.ammunation.cooldown,
         minPolice = Config.Types.ammunation.minPolice,
+        requiredItems = Config.Types.ammunation.requiredItems,
         payoutLabel = 'Guns, ammo, $2,000 – $5,000',
         interactions = interactions,
     }
@@ -239,7 +243,6 @@ Config.Locations = {
         gps = vector3(150.87, -1037.16, 29.34),
         heading = 160.0,
         payoutLabel = '$40,000 – $90,000',
-        minPolice = 3,
         lockerMin = 8000,
         lockerMax = 14500,
         hack = vector3(147.35, -1046.24, 29.37),
@@ -263,7 +266,6 @@ Config.Locations = {
         gps = vector3(315.32, -275.55, 53.92),
         heading = 160.0,
         payoutLabel = '$40,000 – $90,000',
-        minPolice = 3,
         lockerMin = 8000,
         lockerMax = 14500,
         hack = vector3(311.69, -284.55, 54.16),
@@ -287,7 +289,6 @@ Config.Locations = {
         gps = vector3(-349.89, -46.44, 49.04),
         heading = 160.0,
         payoutLabel = '$40,000 – $90,000',
-        minPolice = 3,
         lockerMin = 8000,
         lockerMax = 14500,
         hack = vector3(-353.52, -55.47, 49.20),
@@ -311,10 +312,9 @@ Config.Locations = {
         gps = vector3(-110.94, 6462.53, 31.64),
         heading = 45.0,
         payoutLabel = '$55,000 – $110,000',
-        minPolice = 4,
         lockerMin = 10000,
         lockerMax = 18000,
-        cooldown = 90 * 60,
+        cooldown = 60 * 60,
         hack = vector3(-105.90, 6472.11, 31.90),
         vault = vector3(-105.51, 6475.23, 32.00),
         vaultDoor = {
@@ -408,8 +408,9 @@ Config.Locations = {
         label = 'Sultan — La Mesa lot',
         description = 'Lockpick the marked Sultan and drop it at the docks warehouse.',
         coords = vector3(915.21, -1554.38, 30.75),
-        cooldown = 30 * 60,
+        cooldown = Config.Types.vehicle.cooldown,
         minPolice = Config.Types.vehicle.minPolice,
+        requiredItems = Config.Types.vehicle.requiredItems,
         payoutLabel = '$6,000 – $9,500',
         vehicle = {
             model = 'sultan',
@@ -425,8 +426,9 @@ Config.Locations = {
         label = 'Buffalo — Vinewood Hills',
         description = 'Boost the parked Buffalo and dump it in the LS River tunnel.',
         coords = vector3(232.84, 641.92, 186.40),
-        cooldown = 30 * 60,
+        cooldown = Config.Types.vehicle.cooldown,
         minPolice = Config.Types.vehicle.minPolice,
+        requiredItems = Config.Types.vehicle.requiredItems,
         payoutLabel = '$7,000 – $11,000',
         vehicle = {
             model = 'buffalo2',
@@ -442,8 +444,9 @@ Config.Locations = {
         label = 'Banshee — Elysian docks',
         description = 'Grab the Banshee off the dock and deliver it to the scrapyard.',
         coords = vector3(1204.48, -3117.20, 5.54),
-        cooldown = 35 * 60,
+        cooldown = 25 * 60,
         minPolice = Config.Types.vehicle.minPolice,
+        requiredItems = Config.Types.vehicle.requiredItems,
         payoutLabel = '$8,500 – $13,000',
         vehicle = {
             model = 'banshee',
@@ -459,8 +462,9 @@ Config.Locations = {
         label = 'Sultan RS — Sandy airfield',
         description = 'Lift the Sultan RS from the hangar strip and drop it in Paleto.',
         coords = vector3(1738.21, 3326.10, 41.22),
-        cooldown = 35 * 60,
+        cooldown = 25 * 60,
         minPolice = Config.Types.vehicle.minPolice,
+        requiredItems = Config.Types.vehicle.requiredItems,
         payoutLabel = '$8,000 – $12,500',
         vehicle = {
             model = 'sultanrs',
@@ -478,8 +482,9 @@ Config.Locations = {
         label = 'Gruppe Sechs — Paleto run',
         description = 'The truck leaves Paleto Bank heading south. Stop it, clear the guards, loot the rear.',
         coords = vector3(-113.40, 6469.90, 31.63),
-        cooldown = 60 * 60,
+        cooldown = Config.Types.moneytruck.cooldown,
         minPolice = Config.Types.moneytruck.minPolice,
+        requiredItems = Config.Types.moneytruck.requiredItems,
         payoutLabel = '$28,000 – $48,000',
         truck = {
             model = 'stockade',
@@ -493,6 +498,7 @@ Config.Locations = {
                 vector3(1965.40, 3750.20, 32.25),
             },
             lootSpots = 3,
+            breachItem = I.thermite,
             loot = lootCash(9000, 15000, {
                 { type = 'item', name = 'goldbar', min = 1, max = 2, chance = 40 },
             }),
@@ -504,8 +510,9 @@ Config.Locations = {
         label = 'Gruppe Sechs — Legion run',
         description = 'Armored truck rolling from Legion Fleeca toward the docks.',
         coords = vector3(151.20, -1040.40, 29.37),
-        cooldown = 60 * 60,
+        cooldown = Config.Types.moneytruck.cooldown,
         minPolice = Config.Types.moneytruck.minPolice,
+        requiredItems = Config.Types.moneytruck.requiredItems,
         payoutLabel = '$30,000 – $52,000',
         truck = {
             model = 'stockade',
@@ -519,6 +526,7 @@ Config.Locations = {
                 vector3(1204.80, -3104.50, 5.80),
             },
             lootSpots = 3,
+            breachItem = I.thermite,
             loot = lootCash(10000, 16500, {
                 { type = 'item', name = 'goldbar', min = 1, max = 2, chance = 45 },
             }),
@@ -530,8 +538,9 @@ Config.Locations = {
         label = 'Gruppe Sechs — Sandy run',
         description = 'County truck leaving Sandy 24/7 toward Grapeseed.',
         coords = vector3(1961.10, 3740.20, 32.34),
-        cooldown = 55 * 60,
+        cooldown = Config.Types.moneytruck.cooldown,
         minPolice = Config.Types.moneytruck.minPolice,
+        requiredItems = Config.Types.moneytruck.requiredItems,
         payoutLabel = '$26,000 – $44,000',
         truck = {
             model = 'stockade',
@@ -545,6 +554,7 @@ Config.Locations = {
                 vector3(1706.40, 6425.80, 32.77),
             },
             lootSpots = 3,
+            breachItem = I.thermite,
             loot = lootCash(8500, 14000, {
                 { type = 'item', name = 'goldbar', min = 1, max = 1, chance = 35 },
             }),
@@ -623,4 +633,24 @@ end
 function GetRobberyType(id)
     local loc = GetRobberyLocation(id)
     return loc and Config.Types[loc.type] or nil
+end
+
+function GetRequiredItems(loc)
+    if type(loc) == 'string' then
+        loc = GetRobberyLocation(loc)
+    end
+    if not loc then return {} end
+    if loc.requiredItems then return loc.requiredItems end
+    local typeCfg = Config.Types[loc.type]
+    return (typeCfg and typeCfg.requiredItems) or {}
+end
+
+function GetLocationCooldown(loc)
+    if type(loc) == 'string' then
+        loc = GetRobberyLocation(loc)
+    end
+    if not loc then return 30 * 60 end
+    if loc.cooldown then return loc.cooldown end
+    local typeCfg = Config.Types[loc.type]
+    return (typeCfg and typeCfg.cooldown) or (30 * 60)
 end

@@ -342,7 +342,11 @@ RegisterNetEvent('djfivem-robbery:client:bindTruck', function(jobId, netId, loca
                 onSelect = function()
                     local begin = lib.callback.await('djfivem-robbery:server:lootTruck', false, jobId, crateId)
                     if not begin or not begin.ok then
-                        NotifyClient(begin and begin.reason or 'job_failed', 'error')
+                        if begin and begin.reason == 'missing_item' then
+                            NotifyClient('missing_item', 'error', begin.item or 'thermite')
+                        else
+                            NotifyClient(begin and begin.reason or 'job_failed', 'error')
+                        end
                         return
                     end
                     local ok = SkillCheck(Config.Skill.truck) and Progress('Grabbing cash crates', 8000, Config.Anims.loot)

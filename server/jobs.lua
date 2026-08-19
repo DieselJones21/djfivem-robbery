@@ -1,5 +1,6 @@
 Jobs = {}
 Cooldowns = {}
+PlayerCooldowns = {}
 local jobSeq = 0
 
 local function nextJobId()
@@ -20,9 +21,45 @@ end
 function ResetCooldown(locationId)
     if locationId == 'all' or not locationId then
         Cooldowns = {}
+        PlayerCooldowns = {}
         return
     end
     Cooldowns[locationId] = nil
+end
+
+local function citizenId(src)
+    local player = GetPlayer(src)
+    return player and player.PlayerData.citizenid or nil
+end
+
+function PlayerCooldownRemaining(src)
+    if not Config.PlayerCooldown or Config.PlayerCooldown <= 0 then return 0 end
+    local cid = citizenId(src)
+    if not cid then return 0 end
+    return math.max(0, (PlayerCooldowns[cid] or 0) - os.time())
+end
+
+function SetPlayerCooldown(src)
+    if not Config.PlayerCooldown or Config.PlayerCooldown <= 0 then return end
+    local cid = citizenId(src)
+    if cid then
+        PlayerCooldowns[cid] = os.time() + Config.PlayerCooldown
+    end
+end
+
+local function crewMissingItem(crew, loc)
+    local required = GetRequiredItems(loc)
+    for i = 1, #required do
+        local req = required[i]
+        local have = 0
+        for src in pairs(crew.members) do
+            local count = exports.ox_inventory:Search(src, 'count', req.item) or 0
+            have += count
+        end
+        if have < (req.count or 1) then
+            return req
+        end
+    end
 end
 
 local function interactionById(loc, id)
@@ -213,10 +250,22 @@ function StartJob(src)
         return false, 'on_cooldown', FormatTime(remaining)
     end
 
+    for member in pairs(crew.members) do
+        local playerCd = PlayerCooldownRemaining(member)
+        if playerCd > 0 then
+            return false, 'player_cooldown', CharacterName(member), FormatTime(playerCd)
+        end
+    end
+
     local police = CountPolice()
-    local need = loc.minPolice or typeCfg.minPolice
-    if police < need then
+    local need = loc.minPolice or typeCfg.minPolice or 0
+    if need > 0 and police < need then
         return false, 'not_enough_police', police, need
+    end
+
+    local missing = crewMissingItem(crew, loc)
+    if missing then
+        return false, 'missing_item', ItemLabel(missing.item)
     end
 
     for member in pairs(crew.members) do
@@ -255,7 +304,10 @@ function StartJob(src)
 
     Jobs[jobId] = job
     crew.jobId = jobId
-    SetCooldown(loc.id, loc.cooldown)
+    SetCooldown(loc.id, GetLocationCooldown(loc))
+    EachCrewMember(crew, function(member)
+        SetPlayerCooldown(member)
+    end)
 
     broadcastJob(job)
     EachCrewMember(crew, function(member)
@@ -509,6 +561,13 @@ lib.callback.register('djfivem-robbery:server:lootTruck', function(source, jobId
         end
     end
 
+    if not job.rearOpened then
+        local item = (loc.truck and loc.truck.breachItem) or Config.Items.thermite
+        if not HasItem(source, item, 1) then
+            return { ok = false, reason = 'missing_item', item = ItemLabel(item) }
+        end
+    end
+
     job.busy[crateId] = source
     return { ok = true }
 end)
@@ -524,6 +583,11 @@ RegisterNetEvent('djfivem-robbery:server:finishTruckLoot', function(jobId, crate
     end
     local loc = GetRobberyLocation(job.locationId)
     local crew = Crews[job.crewId]
+    if not job.rearOpened then
+        local item = (loc.truck and loc.truck.breachItem) or Config.Items.thermite
+        ConsumeItem(src, item, 100)
+        job.rearOpened = true
+    end
     job.completed[crateId] = true
     alertPolice(job, loc, { alertsPolice = true })
     giveRewards(src, loc.truck.loot, crew)
