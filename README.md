@@ -59,6 +59,8 @@ ensure djfivem-robbery
 /giveitem [id] robbery_tablet 1
 ```
 
+The tablet UI is a dark dashboard (black / red / white / blue) with photos for every contract and icons for the required kit. Swap files in `web/images/jobs` and `web/images/items` if you want custom art.
+
 ## How it plays
 
 1. Use the crime tablet from inventory.
