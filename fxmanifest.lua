@@ -37,6 +37,8 @@ files {
     'web/index.html',
     'web/style.css',
     'web/script.js',
+    'web/images/jobs/*.jpg',
+    'web/images/items/*',
     'locales/*.json',
 }
 
