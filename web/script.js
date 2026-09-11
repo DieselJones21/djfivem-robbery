@@ -256,7 +256,14 @@ document.querySelectorAll('.rail-btn').forEach((btn) => {
     });
 });
 
-document.getElementById('closeBtn').addEventListener('click', () => nui('close'));
+document.getElementById('closeBtn').addEventListener('click', () => {
+    nui('close');
+    if (!window.invokeNative) {
+        app.classList.add('hidden');
+        document.getElementById('nearbyList').classList.add('hidden');
+        if (state.job) renderHud(state.job);
+    }
+});
 document.getElementById('leaveBtn').addEventListener('click', async () => {
     await nui('leaveCrew');
     state.crew = null;
@@ -436,6 +443,7 @@ window.addEventListener('message', (event) => {
     const { action, payload, tab, job, kind, config } = event.data || {};
     if (action === 'open') {
         app.classList.remove('hidden');
+        hud.classList.add('hidden');
         applyPayload(payload || {}, tab);
     }
     if (action === 'sync' && payload) {
@@ -444,8 +452,13 @@ window.addEventListener('message', (event) => {
     if (action === 'close') {
         app.classList.add('hidden');
         document.getElementById('nearbyList').classList.add('hidden');
+        if (state.job) renderHud(state.job);
     }
-    if (action === 'hud') renderHud(job);
+    if (action === 'hud') {
+        state.job = job || null;
+        if (app.classList.contains('hidden')) renderHud(job);
+        else hud.classList.add('hidden');
+    }
     if (action === 'minigame') openMinigame(kind, config);
 });
 
@@ -506,12 +519,12 @@ function demoMode() {
         subtitle: 'Contract Network v2',
     }, 'contracts');
     app.classList.remove('hidden');
-    renderHud({
+    state.job = {
         label: 'Pacific Standard — Downtown',
         remaining: 1420,
         stages: ['Cut rooftop power', 'Hack inner keypad', 'C4 vault', 'Loot trolleys'],
         completed: { power: true },
-    });
+    };
 }
 
 if (!window.invokeNative) {
