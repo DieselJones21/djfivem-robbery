@@ -55,6 +55,27 @@ function resourceName() {
 }
 
 function nui(name, data = {}) {
+    if (!window.invokeNative) {
+        if (name === 'createCrew') {
+            const loc = locationById(data.locationId);
+            return Promise.resolve({
+                ok: true,
+                crew: {
+                    locationId: data.locationId,
+                    maxPlayers: loc?.maxPlayers || 4,
+                    members: [{ name: state.name || 'You', host: true }],
+                },
+            });
+        }
+        if (name === 'leaveCrew' || name === 'startJob' || name === 'close' || name === 'invite' || name === 'minigameResult') {
+            return Promise.resolve({ ok: true });
+        }
+        if (name === 'nearby') return Promise.resolve([]);
+        if (name === 'refresh') return Promise.resolve({ ok: false });
+        if (name === 'buyItem') {
+            return Promise.resolve({ ok: true, store: state.store, qty: data.qty || 1, label: data.item });
+        }
+    }
     return fetch(`https://${resourceName()}/${name}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=UTF-8' },
