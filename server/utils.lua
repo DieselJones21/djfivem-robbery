@@ -2,6 +2,10 @@ local resource = GetCurrentResourceName()
 
 lib.locale(Config.Locale)
 
+local itemLabelCache = {}
+local rateBuckets = {}
+local lastCallback = {}
+
 function Notify(src, key, nType, ...)
     local msg = locale(key, ...)
     TriggerClientEvent('ox_lib:notify', src, {
@@ -31,29 +35,6 @@ function IsPoliceJob(name)
     return Config.PoliceJobs[name] == true
 end
 
-function IsOnDutyPolice(src)
-    local player = GetPlayer(src)
-    if not player then return false end
-    local job = player.PlayerData.job
-    if not job or not IsPoliceJob(job.name) then return false end
-    if Config.RequireOnDuty then
-        return job.onduty == true
-    end
-    return true
-end
-
-function CountPolice()
-    local count = 0
-    local players = exports.qbx_core:GetQBPlayers()
-    for src in pairs(players) do
-        src = tonumber(src) or src
-        if IsOnDutyPolice(src) then
-            count += 1
-        end
-    end
-    return count
-end
-
 function PlayerCoords(src)
     local ped = GetPlayerPed(src)
     if not ped or ped == 0 then return nil end
@@ -63,7 +44,7 @@ end
 function Distance(src, coords)
     local pos = PlayerCoords(src)
     if not pos or not coords then return 9999.0 end
-    return #(pos - vec3(coords.x, coords.y, coords.z))
+    return #(pos - vec3(coords.x + 0.0, coords.y + 0.0, coords.z + 0.0))
 end
 
 function HasItem(src, item, count)
@@ -84,8 +65,12 @@ end
 
 function ItemLabel(item)
     if not item then return '' end
+    local cached = itemLabelCache[item]
+    if cached then return cached end
     local data = exports.ox_inventory:Items(item)
-    return (data and data.label) or item
+    local label = (data and data.label) or item
+    itemLabelCache[item] = label
+    return label
 end
 
 function IsDead(src)
@@ -96,7 +81,7 @@ function IsDead(src)
 end
 
 function FormatTime(seconds)
-    seconds = math.max(0, math.floor(seconds))
+    seconds = math.max(0, math.floor(seconds or 0))
     local m = math.floor(seconds / 60)
     local s = seconds % 60
     if m <= 0 then
@@ -113,7 +98,7 @@ end
 function SendWebhook(title, description)
     if not Config.Webhook.enabled or Config.Webhook.url == '' then return end
     PerformHttpRequest(Config.Webhook.url, function() end, 'POST', json.encode({
-        username = 'Robbery Tablet',
+        username = 'NEXUS Contracts',
         embeds = {{
             title = title,
             description = description,
@@ -127,3 +112,54 @@ function Debug(...)
         print(('[%s]'):format(resource), ...)
     end
 end
+
+function RandomToken()
+    return ('%s%s'):format(math.random(100000, 999999), os.time())
+end
+
+function RateLimit(src, key)
+    local cfg = Config.AntiExploit or {}
+    local now = os.clock()
+    local stampKey = ('%s:%s'):format(src, key)
+    local last = lastCallback[stampKey]
+    if last and (now - last) < (cfg.callbackWindow or 1.25) then
+        return false
+    end
+    lastCallback[stampKey] = now
+
+    local bucketKey = tostring(src)
+    local bucket = rateBuckets[bucketKey]
+    local window = 4.0
+    if not bucket or (now - bucket.started) > window then
+        rateBuckets[bucketKey] = { started = now, count = 1 }
+        return true
+    end
+    bucket.count += 1
+    if bucket.count > (cfg.maxCallbacksPerWindow or 8) then
+        return false
+    end
+    return true
+end
+
+function GetAccountMoney(src, account)
+    local player = GetPlayer(src)
+    if not player then return 0 end
+    local money = player.PlayerData.money or {}
+    return money[account or Config.CashAccount] or 0
+end
+
+function RemoveAccountMoney(src, account, amount)
+    local player = GetPlayer(src)
+    if not player then return false end
+    return player.Functions.RemoveMoney(account or Config.CashAccount, amount, 'nexus-store') == true
+end
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    rateBuckets[tostring(src)] = nil
+    for key in pairs(lastCallback) do
+        if key:find('^' .. src .. ':') then
+            lastCallback[key] = nil
+        end
+    end
+end)

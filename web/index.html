@@ -4,74 +4,123 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style.css" />
-    <title>Crime Tablet</title>
+    <title>NEXUS</title>
 </head>
 <body>
+    <div id="hud" class="hud hidden">
+        <div class="hud-card">
+            <p class="hud-kicker" id="hudKicker">LIVE CONTRACT</p>
+            <h3 id="hudTitle">—</h3>
+            <p class="hud-time" id="hudTime"></p>
+            <ul id="hudStages"></ul>
+        </div>
+    </div>
+
+    <div id="minigame" class="mini hidden">
+        <div class="mini-card">
+            <p class="mini-kicker" id="miniKicker">SECURITY</p>
+            <h2 id="miniTitle">Bypass</h2>
+            <p class="mini-sub" id="miniSub"></p>
+            <div id="miniBody"></div>
+            <div class="mini-bar"><span id="miniTimer"></span></div>
+        </div>
+    </div>
+
     <div id="app" class="hidden">
-        <div class="tablet">
-            <header class="nav">
-                <div class="brand">
-                    <span class="mark"></span>
+        <div class="shell">
+            <aside class="rail">
+                <div class="logo">
+                    <span class="logo-mark">◆</span>
                     <div>
-                        <p class="eyebrow">Contracts</p>
-                        <h1 id="greeting">Operator</h1>
+                        <strong id="brandName">NEXUS</strong>
+                        <span id="brandSub">Contract Network v2</span>
                     </div>
                 </div>
-                <nav class="tabs" id="typeTabs"></nav>
-                <div class="nav-right">
-                    <div class="userchip">
-                        <div>
-                            <strong id="cooldownLabel">Ready</strong>
-                            <span>Personal cooldown</span>
-                        </div>
-                        <div class="avatar">OP</div>
+                <nav class="rail-nav">
+                    <button class="rail-btn active" data-view="contracts">Contracts</button>
+                    <button class="rail-btn" data-view="shop">Market</button>
+                    <button class="rail-btn" data-view="crew">Crew</button>
+                </nav>
+                <div class="rail-stats">
+                    <div>
+                        <span>Police</span>
+                        <strong id="pdCount">0</strong>
                     </div>
-                    <button id="closeBtn" class="icon-btn" title="Close">✕</button>
+                    <div>
+                        <span>Cooldown</span>
+                        <strong id="cooldownLabel">Ready</strong>
+                    </div>
+                    <div>
+                        <span>Operator</span>
+                        <strong id="greeting">—</strong>
+                    </div>
                 </div>
-            </header>
+                <button id="closeBtn" class="rail-close">Close</button>
+            </aside>
 
-            <section class="metrics" id="metrics"></section>
+            <section class="stage">
+                <header class="top">
+                    <div>
+                        <p class="eyebrow" id="viewEyebrow">Available jobs</p>
+                        <h1 id="viewTitle">Contracts</h1>
+                    </div>
+                    <div class="filters" id="typeTabs"></div>
+                </header>
 
-            <main>
-                <section class="detail">
-                    <div class="hero">
-                        <img id="heroImage" alt="" />
-                        <div class="hero-fade">
-                            <p class="hero-kicker" id="heroKicker">Select a contract</p>
-                            <h2 id="heroTitle">Choose a target</h2>
+                <div id="viewContracts" class="view">
+                    <div class="layout">
+                        <article class="hero-panel">
+                            <div class="hero-art" id="heroArt"></div>
+                            <div class="hero-copy">
+                                <p class="hero-kicker" id="heroKicker">Select a contract</p>
+                                <h2 id="heroTitle">Choose a target</h2>
+                                <p id="heroDesc" class="desc"></p>
+                                <div class="stars" id="heroStars"></div>
+                                <div class="item-row" id="itemRow"></div>
+                                <div class="pills" id="detailMeta"></div>
+                                <ol class="stages" id="stageList"></ol>
+                            </div>
+                        </article>
+                        <aside class="list-pane">
+                            <div class="list-head">
+                                <h3 id="listTitle">Targets</h3>
+                                <p id="listSub">Select a category</p>
+                            </div>
+                            <div id="locationList" class="target-list"></div>
+                        </aside>
+                    </div>
+                </div>
+
+                <div id="viewShop" class="view hidden">
+                    <div class="shop-head">
+                        <div>
+                            <p class="eyebrow" id="shopLabel">Nexus Supply</p>
+                            <p class="desc" id="shopSub">Untraceable kit. No receipts.</p>
+                        </div>
+                        <div class="balance">
+                            <span>Balance</span>
+                            <strong id="shopBalance">$0</strong>
                         </div>
                     </div>
-                    <div class="detail-body">
-                        <p id="heroDesc" class="desc">Pick a job from the list to see the photo, kit, and crew size.</p>
-                        <div>
-                            <p class="section-label">Required items</p>
-                            <div id="itemRow" class="item-row"></div>
-                        </div>
-                        <div class="detail-meta" id="detailMeta"></div>
-                        <div id="crewBox" class="crew-box">
-                            <p class="muted" id="crewEmpty">Select a target to form a crew.</p>
-                            <div id="crewBody" class="hidden">
-                                <p class="section-label">Crew</p>
-                                <ul id="memberList"></ul>
-                                <div id="nearbyList" class="nearby hidden"></div>
-                                <div class="actions">
-                                    <button id="inviteBtn" class="btn ghost">Invite nearby</button>
-                                    <button id="startBtn" class="btn primary">Start robbery</button>
-                                    <button id="leaveBtn" class="btn danger">Leave crew</button>
-                                </div>
+                    <div id="shopGrid" class="shop-grid"></div>
+                </div>
+
+                <div id="viewCrew" class="view hidden">
+                    <div class="crew-panel">
+                        <p class="muted" id="crewEmpty">Select a target from Contracts to form a crew.</p>
+                        <div id="crewBody" class="hidden">
+                            <p class="section-label">Active crew</p>
+                            <ul id="memberList"></ul>
+                            <div id="nearbyList" class="nearby hidden"></div>
+                            <div class="actions">
+                                <button id="inviteBtn" class="btn ghost">Invite nearby</button>
+                                <button id="startBtn" class="btn primary">Start contract</button>
+                                <button id="leaveBtn" class="btn danger">Leave crew</button>
                             </div>
                         </div>
                     </div>
-                </section>
-
-                <aside class="list-pane">
-                    <div class="list-head">
-                        <h3 id="listTitle">Targets</h3>
-                        <p id="listSub">No cops required</p>
-                    </div>
-                    <div id="locationList" class="target-list"></div>
-                </aside>
-            </main>
+                </div>
+            </section>
         </div>
     </div>
     <script src="script.js"></script>

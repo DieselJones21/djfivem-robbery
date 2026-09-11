@@ -4,8 +4,8 @@ lua54 'yes'
 
 name 'djfivem-robbery'
 author 'DieselJones'
-description 'Qbox robbery tablet for banks, stores, ATMs, vehicles, money trucks, and Ammunation'
-version '1.0.0'
+description 'NEXUS v2 — Qbox heist pack with tablet, kit store, Wasabi PD/MDT dispatch, and armed guards'
+version '2.0.0'
 
 ox_libs {
     'locale',
@@ -14,20 +14,25 @@ ox_libs {
 shared_scripts {
     '@ox_lib/init.lua',
     'shared/config.lua',
+    'shared/store.lua',
     'shared/locations.lua',
 }
 
 client_scripts {
     'client/utils.lua',
     'client/minigames.lua',
+    'client/guards.lua',
+    'client/shop.lua',
     'client/tablet.lua',
     'client/robbery.lua',
 }
 
 server_scripts {
     'server/utils.lua',
+    'server/police.lua',
     'server/crew.lua',
     'server/jobs.lua',
+    'server/store.lua',
     'server/main.lua',
 }
 

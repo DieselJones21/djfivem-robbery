@@ -1,30 +1,42 @@
-# djfivem-robbery
+# djfivem-robbery v2 — NEXUS
 
-A simpler Qbox robbery tablet. Players use a `robbery_tablet` item from ox_inventory, form a crew, and run a short list of default-map jobs instead of a huge heist pack.
+Qbox heist pack: a crime tablet, 15 contract types, a built-in kit store, Wasabi police / MDT / dispatch alerts, armed guards on the heavy jobs, and server-side anti-exploit checks.
 
-## Crew sizes
+Folder name must stay `djfivem-robbery` (the tablet item export points at that name).
 
-| Job | Max players |
-| --- | --- |
-| Bank heists | 4 |
-| Store robberies | 4 |
-| Ammunation stores | 4 |
-| Money trucks | 4 |
-| ATMs | 2 |
-| Vehicle robberies | 2 |
+## What players get
 
-Solo is allowed. The tablet just caps the lobby.
+Use a `robbery_tablet` from ox_inventory. The tablet has three tabs:
 
-## Included contracts
+- **Contracts** — pick a job type, pick a location, form a crew
+- **Market** — buy lockpicks, drills, thermite, C4, laptops, and a spare tablet
+- **Crew** — invite nearby players and start when kit + police counts are met
 
-- **Banks:** 3 Fleeca branches (Legion, Alta, Burton) plus Paleto Savings
-- **Stores:** 6x 24/7 / LTD (Grove, Innocence, Little Seoul, Vinewood, Sandy, Paleto)
-- **ATMs:** 6 street machines
-- **Vehicles:** 4 boost-and-deliver jobs
-- **Money trucks:** 3 Gruppe Sechs routes
-- **Ammunation:** 5 stores (hack, smash cases, drill locker)
+A world dealer (Nexus Supply) also opens the Market tab. GPS waypoint is set on start. ox_target handles every objective. Heavy jobs spawn armed guards. Police get a Wasabi MDT dispatch on the first noisy action.
 
-Locations use **vanilla GTA V interiors**. If you run Gabz or other MLOs, move the coords in `shared/locations.lua`.
+## Contract types
+
+| Type | Max crew | Default PD | Notes |
+| --- | --- | --- | --- |
+| ATM | 2 | 0 | Drill cassette |
+| Store | 4 | 1 | Tills then office safe |
+| House | 3 | 1 | Lockpick door, search rooms |
+| Vehicle | 2 | 1 | Boost and deliver |
+| Ammunation | 4 | 2 | Cameras, cases, locker + guards |
+| Fleeca | 4 | 2 | Hack, thermite, boxes + guards |
+| Money truck | 4 | 3 | Stop Stockade, thermite rear |
+| Cargo truck | 4 | 2 | Hijack mule/benson, crack crate |
+| Paleto | 5 | 4 | Cut power, vault, **armed on start** |
+| Vangelico | 5 | 4 | Gallery alarm, cases, office safe |
+| Train | 5 | 4 | Davis Quartz freight + guards |
+| Yacht | 5 | 4 | Aquarius board, cabins, owner safe |
+| Cargo ship | 6 | 4 | Elysian freighter containers |
+| Bobcat | 6 | 5 | Yard assault, C4 vault |
+| Pacific | 6 | 6 | Power, keypad, C4, trolleys |
+
+Locations use **vanilla GTA V interiors**. If you run Gabz or other MLOs, move coords in `shared/locations.lua`.
+
+Set `Config.Types.<id>.enabled = false` to hide a type.
 
 ## Requirements
 
@@ -33,101 +45,130 @@ Locations use **vanilla GTA V interiors**. If you run Gabz or other MLOs, move t
 - [ox_inventory](https://github.com/overextended/ox_inventory)
 - [ox_target](https://github.com/overextended/ox_target)
 
-Keep this resource folder named `djfivem-robbery` (the tablet item export points at that name).
+### Wasabi (recommended)
+
+- `wasabi_police` or `wasabi_police_v2` — on-duty count via `getPoliceOnline`
+- `wasabi_mdt` — live dispatch via `CreateDispatch` (MDT v2 includes dispatch)
+
+If Wasabi is not started, the script falls back to qbx job counts and a builtin ox_lib + map-blip alert.
 
 ## Install
 
-1. Drop the folder into `resources` (or a `[qbx]` pack).
-2. Copy `install/images/robbery_tablet.png` into `ox_inventory/web/images/`.
-3. Merge the items from `install/ox_inventory_items.lua` into `ox_inventory/data/items.lua`.
-   - `robbery_tablet` is required.
-   - Skip any extras you already have (`lockpick`, `electronickit`, `thermite`, `drill`, `crowbar`, `black_money`).
-4. Restart `ox_inventory` (or the server) after adding items.
-5. Start order in `server.cfg`:
+1. Drop the folder into `resources` (keep the name `djfivem-robbery`).
+2. Copy `install/images/robbery_tablet.png` into `ox_inventory/web/images/` if you have it.
+3. Merge `install/ox_inventory_items.lua` into `ox_inventory/data/items.lua`.
+   - Required: `robbery_tablet`
+   - New v2 items: `hacking_laptop`, `c4_charge`, `advancedlockpick`, `trojan_usb`, `diamond`
+   - Skip extras you already have
+4. Restart `ox_inventory`, then this resource.
 
 ```cfg
 ensure ox_lib
 ensure ox_target
 ensure qbx_core
 ensure ox_inventory
+ensure wasabi_police
+ensure wasabi_mdt
 ensure djfivem-robbery
 ```
 
-6. Give a tablet in-game, for example:
+Give a tablet:
 
 ```
 /giveitem [id] robbery_tablet 1
 ```
 
-The tablet UI is a dark dashboard (black / red / white / blue) with photos for every contract and icons for the required kit. Swap files in `web/images/jobs` and `web/images/items` if you want custom art.
+Or buy one from Nexus Supply.
 
-## How it plays
+## How a contract plays
 
-1. Use the crime tablet from inventory.
-2. Pick a job type, then a location. That creates a crew.
-3. **Invite nearby** players (within 8m). They get an ox_lib prompt.
-4. **Start contract** when the crew has the required tools and the location is not on cooldown.
-5. GPS is set. Use ox_target at the objective.
-6. ox_lib skill checks + progress bars handle hacking, lockpicking, thermite, drilling, and looting.
-7. Police still get a blip/alert on the first noisy action (no cops need to be on duty to start).
+1. Open the tablet, pick a type and location (creates a crew).
+2. Invite nearby players (8m). On-duty cops cannot join.
+3. Start when the crew has the listed kit, enough police, and the site is not on cooldown.
+4. GPS is set. ox_target appears **only for that live job** (idle clients do not keep every zone registered).
+5. Harder jobs use keypad / thermite-grid / circuit minigames, then a progress bar.
+6. First noisy step fires Wasabi MDT dispatch. Some sites spawn armed guards on start; others spawn on the alarm.
+7. Location cooldown starts when the contract **starts**. Personal cooldown is 8 minutes by default.
 
-## Required items
+## Kit store
 
-Someone in the crew must be holding the kit before the contract will start. The player who uses a tool still needs that item in their inventory.
+`shared/store.lua`
 
-| Job | Tools | Why |
-| --- | --- | --- |
-| ATM | `drill` | Open the cassette |
-| Store | `lockpick`, `drill` | Tills, then the office safe |
-| Vehicle | `lockpick` | Unlock the target car |
-| Money truck | `thermite` | Burn the armored rear doors |
-| Bank | `electronickit`, `thermite` | Hack the keypad, then the vault |
-| Ammunation | `electronickit`, `crowbar`, `drill` | Cameras, display cases, gun locker |
+- Ped + optional blip behind the garment factory (`707.34, -966.84, 30.41`)
+- Prices, stock, and currency are config
+- `useDirtyCash = true` charges `black_money` instead of cash
+- `requireProximity = true` if you want tablet purchases to only work at the dealer
+- Server validates quantity, stock, funds, and refunds if the inventory add fails
 
-## Cooldowns
-
-- **Location cooldown** starts when the contract starts (not when it ends).
-- **Player cooldown** is 5 minutes after you start any contract.
-- Defaults: ATM 15m, vehicle 20m, store 25m, Ammunation 40m, bank/truck 45m, Paleto 60m.
-
-No police are required (`minPolice = 0`). Raise it later in `shared/config.lua` if you want.
-
-Payouts default to the `black_money` item. If that item is missing, cash is granted instead.
-
-## Config you will actually touch
+## Police / MDT / dispatch
 
 `shared/config.lua`
 
-- `PoliceJobs` and `RequireOnDuty`
-- `Types.*.maxPlayers`, `minPolice` (default **0**), `cooldown`, `requiredItems`
-- `PlayerCooldown` (default 5 minutes)
-- `Items` names to match your inventory
-- `RewardMode` = `looter` or `split`
-- `Dispatch.resource` = `builtin` (default), `ps-dispatch`, `cd_dispatch`, `qs-dispatch`, or `custom`
-- `Webhook` for Discord logs
-- `JobTimeout` (default 20 minutes)
+```lua
+Config.Police = {
+    countResource = 'auto', -- wasabi_police | wasabi_police_v2 | auto | qbx
+    blockOfficersFromTablet = true,
+    useWasabiMdtOfficerCheck = true,
+}
 
-`shared/locations.lua` — coords, rewards, cooldowns, vault door models.
+Config.Dispatch = {
+    enabled = true,
+    resource = 'wasabi_mdt', -- wasabi_mdt | wasabi_dispatch | ps-dispatch | cd_dispatch | qs-dispatch | builtin | custom
+    code = '10-90',
+    senderName = 'Silent Alarm',
+    fallbackBuiltin = true,
+}
+```
 
-Admin cooldown reset:
+Per-type titles, codes, and priorities live in `Config.DispatchProfiles`.
+
+## Guards
+
+`Config.Guards.enabled` is the global switch. Per-location blocks in `shared/locations.lua`:
+
+```lua
+guards = {
+    enabled = true,
+    spawnOn = 'start', -- or 'alarm'
+    model = 's_m_m_armoured_01',
+    weapon = 'WEAPON_CARBINERIFLE',
+    accuracy = 48,
+    armour = 80,
+    peds = { vector4(x, y, z, heading), ... },
+}
+```
+
+Paleto, Pacific, Bobcat, yacht, train, cargo ship, some houses/vehicles, and Ammunation spawn armed peds.
+
+## Anti-exploit
+
+- Rewards are granted only on the server
+- Interaction tokens expire (default 90s); finish must match begin
+- Distance + item re-check on finish
+- Rate limits on tablet, start, loot, and shop callbacks
+- Crate IDs must match the job's loot-spot count
+- Police cannot open the tablet or join a crew
+- Target zones exist only while a job is live
+- Shop refunds if `AddItem` fails
+
+## Config you will actually touch
+
+`shared/config.lua` — police jobs, cooldowns, min police, skill checks, minigame difficulty, dispatch, anti-exploit, webhook, UI brand
+
+`shared/store.lua` — dealer coords, prices, stock
+
+`shared/locations.lua` — coords, payouts, guard posts, vault doors
+
+Admin cooldown reset (`group.admin`):
 
 ```
 /robberyreset all
 /robberyreset fleeca_legion
 ```
 
-Restricted to `group.admin`.
-
-## Dispatch
-
-Default `builtin` notifies on-duty `Config.PoliceJobs` with ox_lib + a map blip.
-
-For ps-dispatch / cd_dispatch / qs-dispatch, set `Config.Dispatch.resource` to that name. Those resources vary by version; if the alert does not fire, keep `builtin` or hook `Config.Dispatch.custom`.
-
 ## Notes
 
-- On-duty police cannot open the tablet or join a crew.
-- A location goes on cooldown when the contract **starts**, not when it finishes. `/robberyreset all` clears location and personal cooldowns.
-- Bank vault doors rotate on the vanilla `v_ilev_gb_vauldr` / Paleto vault model. Doorlock resources are not required.
-- Money trucks spawn a Stockade with two armed guards. Kill or stop the truck, then loot the rear crates.
-- Vehicle jobs lockpick at the spawn, then deliver to the marked drop-off.
+- Vault doors rotate on vanilla models. Doorlock resources are not required.
+- Money / cargo trucks spawn with armed occupants. Kill or stop the vehicle, then loot the rear.
+- Raise `Config.Types.*.minPolice` if your city is busy; lower it for testing.
+- `Config.Debug = true` unlocks `/robberytab` without the item.

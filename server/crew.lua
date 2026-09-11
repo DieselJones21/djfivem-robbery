@@ -39,6 +39,7 @@ function CrewSize(crew)
 end
 
 function EachCrewMember(crew, fn)
+    if not crew then return end
     for src in pairs(crew.members) do
         fn(src)
     end
@@ -65,6 +66,7 @@ function CreateCrew(src, locationId)
     end
     local loc = GetRobberyLocation(locationId)
     if not loc then return false, 'invalid' end
+    if not IsTypeEnabled(loc.type) then return false, 'type_disabled' end
 
     local id = nextCrewId()
     Crews[id] = {
@@ -124,8 +126,10 @@ function InviteToCrew(host, target)
     if crew.jobId then return false, 'location_busy' end
     if PlayerCrew[target] then return false, 'already_in_crew' end
     if not GetPlayer(target) then return false, 'invalid' end
+    if IsOnDutyPolice(target) then return false, 'police_blocked' end
 
     local loc = GetRobberyLocation(crew.locationId)
+    if not loc then return false, 'invalid' end
     local typeCfg = Config.Types[loc.type]
     if CrewSize(crew) >= typeCfg.maxPlayers then
         return false, 'crew_full'
@@ -153,10 +157,15 @@ function InviteToCrew(host, target)
 end
 
 lib.callback.register('djfivem-robbery:server:inviteResponse', function(source, accepted)
+    if not RateLimit(source, 'inviteResponse') then return false end
     local pending = PendingInvites[source]
     PendingInvites[source] = nil
     if not pending then return false end
     if os.time() > pending.expires then return false end
+    if IsOnDutyPolice(source) then
+        Notify(source, 'police_blocked', 'error')
+        return false
+    end
 
     local crew = Crews[pending.crewId]
     if not crew or crew.jobId then
@@ -175,6 +184,7 @@ lib.callback.register('djfivem-robbery:server:inviteResponse', function(source, 
     end
 
     local loc = GetRobberyLocation(crew.locationId)
+    if not loc then return false end
     local typeCfg = Config.Types[loc.type]
     if CrewSize(crew) >= typeCfg.maxPlayers then
         Notify(source, 'crew_full', 'error')
@@ -185,6 +195,7 @@ lib.callback.register('djfivem-robbery:server:inviteResponse', function(source, 
     PlayerCrew[source] = crew.id
     EachCrewMember(crew, function(member)
         Notify(member, 'invite_accepted', 'success', CharacterName(source))
+        TriggerClientEvent('djfivem-robbery:client:crewSync', member, SerializeCrew(crew))
     end)
     return true
 end)
