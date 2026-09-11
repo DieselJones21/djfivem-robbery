@@ -1,6 +1,12 @@
-lib.locale(Config.Locale)
-
 local dropoffZone
+local jobZones = {}
+
+local function clearJobZones()
+    for i = 1, #jobZones do
+        exports.ox_target:removeZone(jobZones[i])
+    end
+    jobZones = {}
+end
 
 local function canUseInteraction(loc, interaction)
     if not ActiveJob then return false end
@@ -29,39 +35,36 @@ local function handleInteraction(loc, interaction)
         return
     end
 
-    local success = RunMinigame(interaction)
-    lib.callback.await('djfivem-robbery:server:finishInteraction', false, loc.id, interaction.id, success)
+    local success = RunMinigame(begin.interaction or interaction)
+    lib.callback.await('djfivem-robbery:server:finishInteraction', false, loc.id, interaction.id, success, begin.token)
 end
 
-local function registerTargets()
-    for i = 1, #Config.Locations do
-        local loc = Config.Locations[i]
-        if loc.interactions then
-            for n = 1, #loc.interactions do
-                local interaction = loc.interactions[n]
-                local zoneName = ('dj_robbery:%s:%s'):format(loc.id, interaction.id)
-                local zoneId = exports.ox_target:addSphereZone({
-                    coords = interaction.coords,
-                    radius = 1.15,
-                    debug = Config.Debug,
-                    options = {
-                        {
-                            name = zoneName,
-                            icon = ('fa-solid fa-%s'):format(interaction.icon or 'hand'),
-                            label = interaction.label,
-                            distance = 2.0,
-                            canInteract = function()
-                                return canUseInteraction(loc, interaction)
-                            end,
-                            onSelect = function()
-                                handleInteraction(loc, interaction)
-                            end,
-                        },
-                    },
-                })
-                TargetZones[#TargetZones + 1] = zoneId
-            end
-        end
+local function registerJobTargets(loc)
+    clearJobZones()
+    if not loc.interactions then return end
+    for n = 1, #loc.interactions do
+        local interaction = loc.interactions[n]
+        local zoneName = ('dj_robbery:%s:%s'):format(loc.id, interaction.id)
+        local zoneId = exports.ox_target:addSphereZone({
+            coords = interaction.coords,
+            radius = 1.15,
+            debug = Config.Debug,
+            options = {
+                {
+                    name = zoneName,
+                    icon = ('fa-solid fa-%s'):format(interaction.icon or 'hand'),
+                    label = interaction.label,
+                    distance = 2.0,
+                    canInteract = function()
+                        return canUseInteraction(loc, interaction)
+                    end,
+                    onSelect = function()
+                        handleInteraction(loc, interaction)
+                    end,
+                },
+            },
+        })
+        jobZones[#jobZones + 1] = zoneId
     end
 end
 
@@ -103,8 +106,16 @@ local function setupDropoff(job, loc)
     })
 end
 
+local function pushHud(job)
+    SendNUIMessage({
+        action = 'hud',
+        job = job,
+    })
+end
+
 RegisterNetEvent('djfivem-robbery:client:jobSync', function(job)
     ActiveJob = job
+    pushHud(job)
 end)
 
 RegisterNetEvent('djfivem-robbery:client:jobStarted', function(job, locationId)
@@ -112,24 +123,26 @@ RegisterNetEvent('djfivem-robbery:client:jobStarted', function(job, locationId)
     local loc = GetRobberyLocation(locationId)
     if not loc then return end
     SetGps(loc.coords)
-    if not SpawnedEntities[job.id] then
-        SpawnedEntities[job.id] = { blips = {}, peds = {} }
-    end
+    registerJobTargets(loc)
+    local bundle = EnsureJobBundle(job.id)
     local blip = AddJobBlip(loc.coords, 1, 1, loc.label)
-    SpawnedEntities[job.id].blips[#SpawnedEntities[job.id].blips + 1] = blip
+    bundle.blips[#bundle.blips + 1] = blip
     if loc.vehicle then
         setupDropoff(job, loc)
         local dropBlip = AddJobBlip(loc.vehicle.dropoff, 50, 5, 'Drop-off')
-        SpawnedEntities[job.id].blips[#SpawnedEntities[job.id].blips + 1] = dropBlip
+        bundle.blips[#bundle.blips + 1] = dropBlip
     end
+    pushHud(job)
 end)
 
 RegisterNetEvent('djfivem-robbery:client:jobEnded', function()
     if ActiveJob then
         DeleteLocalEntities(ActiveJob.id)
     end
+    clearJobZones()
     clearDropoff()
     ActiveJob = nil
+    pushHud(nil)
 end)
 
 RegisterNetEvent('djfivem-robbery:client:openVault', function(locationId)
@@ -184,8 +197,8 @@ RegisterNetEvent('djfivem-robbery:client:spawnVehicle', function(jobId, location
     SetVehicleDoorsLocked(veh, 2)
     SetVehicleNumberPlateText(veh, loc.vehicle.plate or 'BOOST')
     SetEntityAsMissionEntity(veh, true, true)
-    SpawnedEntities[jobId] = SpawnedEntities[jobId] or { blips = {}, peds = {} }
-    SpawnedEntities[jobId].vehicle = veh
+    local bundle = EnsureJobBundle(jobId)
+    bundle.vehicle = veh
     local netId = NetworkGetNetworkIdFromEntity(veh)
     SetNetworkIdExistsOnAllMachines(netId, true)
     SetNetworkIdCanMigrate(netId, true)
@@ -208,20 +221,31 @@ RegisterNetEvent('djfivem-robbery:client:spawnTruck', function(jobId, locationId
 
     local peds = {}
     local seats = { -1, 0 }
-    for i = 1, 2 do
-        local ped = CreatePedInsideVehicle(veh, 4, joaat(truckCfg.guardModel), seats[i], true, true)
-        SetPedArmour(ped, 50)
-        SetPedAccuracy(ped, 40)
-        GiveWeaponToPed(ped, `WEAPON_SMG`, 200, false, true)
-        SetPedRelationshipGroupHash(ped, `HATES_PLAYER`)
+    local extra = truckCfg.extraGuards or 0
+    local count = 2 + extra
+    for i = 1, math.min(count, 4) do
+        local seat = seats[i] or (i - 2)
+        local ped
+        if seat and seat >= -1 and seat <= 2 then
+            ped = CreatePedInsideVehicle(veh, 4, joaat(truckCfg.guardModel), seat, true, true)
+        else
+            local offset = GetOffsetFromEntityInWorldCoords(veh, i % 2 == 0 and 2.2 or -2.2, -1.0, 0.0)
+            ped = CreatePed(4, joaat(truckCfg.guardModel), offset.x, offset.y, offset.z, spawn.w, true, true)
+            TaskEnterVehicle(ped, veh, 4000, seat, 2.0, 1, 0)
+        end
+        SetPedArmour(ped, 60)
+        SetPedAccuracy(ped, 45)
+        GiveWeaponToPed(ped, joaat(truckCfg.guardWeapon or 'WEAPON_SMG'), 220, false, true)
+        SetPedRelationshipGroupHash(ped, EnsureGuardGroup())
         SetPedAsEnemy(ped, true)
         SetPedCombatAttributes(ped, 46, true)
+        SetPedDropsWeaponsWhenDead(ped, false)
         peds[#peds + 1] = ped
     end
 
-    SpawnedEntities[jobId] = SpawnedEntities[jobId] or { blips = {}, peds = {} }
-    SpawnedEntities[jobId].vehicle = veh
-    SpawnedEntities[jobId].peds = peds
+    local bundle = EnsureJobBundle(jobId)
+    bundle.vehicle = veh
+    bundle.peds = peds
 
     local driver = peds[1]
     if driver and truckCfg.waypoints and truckCfg.waypoints[1] then
@@ -301,10 +325,10 @@ RegisterNetEvent('djfivem-robbery:client:bindVehicle', function(jobId, netId, lo
                         end
                         return
                     end
-                    local ok = SkillCheck(Config.Skill.vehicle) and Progress('Lockpicking', 7000, Config.Anims.lockpick)
+                    local ok = SkillCheck(Config.Skill.vehicle) and Progress('Lockpicking', 7500, Config.Anims.lockpick)
                     if ok then
                         SetVehicleDoorsLocked(veh, 1)
-                        TriggerServerEvent('djfivem-robbery:server:vehicleUnlocked', jobId)
+                        TriggerServerEvent('djfivem-robbery:server:vehicleUnlocked', jobId, begin.token)
                         if loc and loc.vehicle then
                             SetGps(loc.vehicle.dropoff)
                         end
@@ -329,7 +353,7 @@ RegisterNetEvent('djfivem-robbery:client:bindTruck', function(jobId, netId, loca
             options[#options + 1] = {
                 name = 'dj_robbery:truck_' .. crateId,
                 icon = 'fa-solid fa-box-open',
-                label = ('Loot cash crate %s'):format(i),
+                label = ('Loot crate %s'):format(i),
                 bones = { 'door_dside_r', 'door_pside_r', 'boot' },
                 distance = 2.5,
                 canInteract = function()
@@ -349,8 +373,9 @@ RegisterNetEvent('djfivem-robbery:client:bindTruck', function(jobId, netId, loca
                         end
                         return
                     end
-                    local ok = SkillCheck(Config.Skill.truck) and Progress('Grabbing cash crates', 8000, Config.Anims.loot)
-                    TriggerServerEvent('djfivem-robbery:server:finishTruckLoot', jobId, crateId, ok)
+                    local skill = loc.type == 'cargotruck' and Config.Skill.cargo or Config.Skill.truck
+                    local ok = SkillCheck(skill) and Progress('Grabbing crates', 8500, Config.Anims.loot)
+                    TriggerServerEvent('djfivem-robbery:server:finishTruckLoot', jobId, crateId, ok, begin.token)
                 end,
             }
         end
@@ -367,11 +392,11 @@ RegisterNetEvent('djfivem-robbery:client:trackTruck', function(netId, waypoints)
         SetBlipColour(blip, 1)
         SetBlipScale(blip, 0.9)
         BeginTextCommandSetBlipName('STRING')
-        AddTextComponentString('Money Truck')
+        AddTextComponentString('Target truck')
         EndTextCommandSetBlipName(blip)
         if ActiveJob then
-            SpawnedEntities[ActiveJob.id] = SpawnedEntities[ActiveJob.id] or { blips = {}, peds = {} }
-            SpawnedEntities[ActiveJob.id].blips[#SpawnedEntities[ActiveJob.id].blips + 1] = blip
+            local bundle = EnsureJobBundle(ActiveJob.id)
+            bundle.blips[#bundle.blips + 1] = blip
         end
         if waypoints and waypoints[1] then
             SetGps(waypoints[1])
@@ -381,18 +406,13 @@ end)
 
 RegisterNetEvent('djfivem-robbery:client:cleanupEntities', function(jobId)
     DeleteLocalEntities(jobId)
+    clearJobZones()
     clearDropoff()
-end)
-
-CreateThread(function()
-    registerTargets()
 end)
 
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() then return end
-    for i = 1, #TargetZones do
-        exports.ox_target:removeZone(TargetZones[i])
-    end
+    clearJobZones()
     clearDropoff()
     if ActiveJob then
         DeleteLocalEntities(ActiveJob.id)

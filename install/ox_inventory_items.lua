@@ -12,27 +12,47 @@ return {
         weight = 400,
         stack = false,
         consume = 0,
-        description = 'Encrypted handheld used to browse and start robbery contracts.',
+        description = 'Encrypted handheld used to browse Nexus contracts and the kit market.',
         client = {
             export = 'djfivem-robbery.useTablet',
             image = 'robbery_tablet.png',
         },
     },
 
-    -- Optional extras if your server does not already have them
     ['lockpick'] = {
         label = 'Lockpick',
         weight = 160,
         stack = true,
         close = true,
-        description = 'Opens store registers and stolen cars.',
+        description = 'Opens store registers, house doors, and stolen cars.',
+    },
+    ['advancedlockpick'] = {
+        label = 'Advanced Lockpick',
+        weight = 180,
+        stack = true,
+        close = true,
+        description = 'Harder locks. Lower break chance.',
     },
     ['electronickit'] = {
         label = 'Electronic Kit',
         weight = 300,
         stack = true,
         close = true,
-        description = 'Used to bypass security keypads.',
+        description = 'Used to bypass security keypads and cameras.',
+    },
+    ['hacking_laptop'] = {
+        label = 'Hacking Laptop',
+        weight = 1500,
+        stack = false,
+        close = true,
+        description = 'Required for Pacific Standard and cargo-ship mainframes.',
+    },
+    ['trojan_usb'] = {
+        label = 'Trojan USB',
+        weight = 80,
+        stack = true,
+        close = true,
+        description = 'Optional payload stick found in house jobs or bought from Nexus Supply.',
     },
     ['thermite'] = {
         label = 'Thermite',
@@ -41,19 +61,26 @@ return {
         close = true,
         description = 'Burns through vault doors and armored plating.',
     },
+    ['c4_charge'] = {
+        label = 'C4 Charge',
+        weight = 750,
+        stack = true,
+        close = true,
+        description = 'Breaches Pacific vault doors and Bobcat cages.',
+    },
     ['drill'] = {
         label = 'Drill',
         weight = 1200,
         stack = false,
         close = true,
-        description = 'Used on ATMs, safes, and weapon lockers.',
+        description = 'Used on ATMs, safes, lockers, and freight seals.',
     },
     ['crowbar'] = {
         label = 'Crowbar',
         weight = 800,
         stack = false,
         close = true,
-        description = 'Smashes Ammunation display cases.',
+        description = 'Smashes display cases and pries cargo.',
     },
     ['black_money'] = {
         label = 'Dirty Cash',
@@ -70,5 +97,11 @@ return {
         label = 'Gold Watch',
         weight = 150,
         stack = true,
+    },
+    ['diamond'] = {
+        label = 'Diamond',
+        weight = 80,
+        stack = true,
+        description = 'Cut stone lifted from jewelry and vault jobs.',
     },
 }

@@ -1,10 +1,12 @@
 lib.locale(Config.Locale)
 
 local tabletOpen = false
+local pendingTab
 
 local function closeTablet()
     if not tabletOpen then return end
     tabletOpen = false
+    pendingTab = nil
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
 end
@@ -31,7 +33,7 @@ local function failReason(data)
     return locale(data.reason)
 end
 
-local function openTablet()
+local function openTablet(tab)
     if IsPauseMenuActive() then return end
     local data = lib.callback.await('djfivem-robbery:server:tabletData', false)
     if not data or not data.ok then
@@ -39,22 +41,26 @@ local function openTablet()
         return
     end
     tabletOpen = true
+    pendingTab = tab
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = 'open',
         payload = data,
+        tab = tab or 'contracts',
     })
 end
 
 exports('useTablet', function()
-    openTablet()
+    openTablet('contracts')
 end)
 
-RegisterNetEvent('djfivem-robbery:client:openTablet', openTablet)
+RegisterNetEvent('djfivem-robbery:client:openTablet', function(tab)
+    openTablet(tab)
+end)
 
 RegisterCommand('robberytab', function()
     if Config.Debug then
-        openTablet()
+        openTablet('contracts')
     end
 end, false)
 
@@ -102,6 +108,24 @@ RegisterNUICallback('startJob', function(_, cb)
     cb(data or { ok = false })
 end)
 
+RegisterNUICallback('buyItem', function(body, cb)
+    local data = lib.callback.await('djfivem-robbery:server:buyItem', false, body.item, body.qty)
+    if data and data.ok then
+        lib.notify({
+            title = locale('shop_open'),
+            description = locale('shop_bought', data.qty, data.label),
+            type = 'success',
+        })
+    elseif data and data.reason then
+        lib.notify({
+            title = locale('shop_open'),
+            description = locale(data.reason),
+            type = 'error',
+        })
+    end
+    cb(data or { ok = false })
+end)
+
 RegisterNetEvent('djfivem-robbery:client:invite', function(data)
     local result = lib.alertDialog({
         header = locale('invite_header'),
@@ -111,4 +135,12 @@ RegisterNetEvent('djfivem-robbery:client:invite', function(data)
         labels = { confirm = 'Join', cancel = 'Decline' },
     })
     lib.callback.await('djfivem-robbery:server:inviteResponse', false, result == 'confirm')
+end)
+
+RegisterNetEvent('djfivem-robbery:client:crewSync', function()
+    if not tabletOpen then return end
+    local data = lib.callback.await('djfivem-robbery:server:tabletData', false)
+    if data and data.ok then
+        SendNUIMessage({ action = 'sync', payload = data })
+    end
 end)

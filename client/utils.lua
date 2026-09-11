@@ -62,6 +62,11 @@ function WaitForNet(netId, timeout)
     return 0
 end
 
+function EnsureJobBundle(jobId)
+    SpawnedEntities[jobId] = SpawnedEntities[jobId] or { blips = {}, peds = {} }
+    return SpawnedEntities[jobId]
+end
+
 function DeleteLocalEntities(jobId)
     local bundle = SpawnedEntities[jobId]
     if bundle then
@@ -82,6 +87,11 @@ function DeleteLocalEntities(jobId)
                 end
             end
         end
+        if bundle.zones then
+            for i = 1, #bundle.zones do
+                exports.ox_target:removeZone(bundle.zones[i])
+            end
+        end
         SpawnedEntities[jobId] = nil
     end
     for netId in pairs(boundEntities) do
@@ -100,4 +110,12 @@ function AddJobBlip(coords, sprite, colour, label)
     AddTextComponentString(label or 'Contract')
     EndTextCommandSetBlipName(blip)
     return blip
+end
+
+function EnsureGuardGroup()
+    local hash = joaat('DJ_NEXUS_GUARDS')
+    AddRelationshipGroup('DJ_NEXUS_GUARDS')
+    SetRelationshipBetweenGroups(5, hash, `PLAYER`)
+    SetRelationshipBetweenGroups(5, `PLAYER`, hash)
+    return hash
 end

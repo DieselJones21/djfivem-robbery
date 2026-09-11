@@ -3,75 +3,129 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Exo+2:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
-    <title>Crime Tablet</title>
+    <title>Heist Pack</title>
 </head>
 <body>
+    <div id="hud" class="hud hidden">
+        <div class="hud-card">
+            <p class="hud-kicker" id="hudKicker">ACTIVE HEIST</p>
+            <h3 id="hudTitle">—</h3>
+            <p class="hud-time" id="hudTime"></p>
+            <ul id="hudStages"></ul>
+        </div>
+    </div>
+
+    <div id="minigame" class="mini hidden">
+        <div class="mini-card">
+            <p class="mini-kicker" id="miniKicker">SECURITY</p>
+            <h2 id="miniTitle">Bypass</h2>
+            <p class="mini-sub" id="miniSub"></p>
+            <div id="miniBody"></div>
+            <div class="mini-bar"><span id="miniTimer"></span></div>
+        </div>
+    </div>
+
     <div id="app" class="hidden">
         <div class="tablet">
-            <header class="nav">
+            <div class="bezel-cam"></div>
+            <header class="topbar">
                 <div class="brand">
-                    <span class="mark"></span>
+                    <span class="brand-badge">HP</span>
                     <div>
-                        <p class="eyebrow">Contracts</p>
-                        <h1 id="greeting">Operator</h1>
+                        <strong id="brandName">HEIST PACK</strong>
+                        <span id="brandSub">15 scenarios</span>
                     </div>
                 </div>
-                <nav class="tabs" id="typeTabs"></nav>
-                <div class="nav-right">
-                    <div class="userchip">
-                        <div>
-                            <strong id="cooldownLabel">Ready</strong>
-                            <span>Personal cooldown</span>
-                        </div>
-                        <div class="avatar">OP</div>
+                <div class="top-stats">
+                    <div class="stat"><i></i><span>COPS</span><b id="pdCount">0</b></div>
+                    <div class="stat"><span>COOLDOWN</span><b id="cooldownLabel">Ready</b></div>
+                    <div class="user">
+                        <span id="greeting">—</span>
+                        <button id="closeBtn" class="x-btn" title="Close">✕</button>
                     </div>
-                    <button id="closeBtn" class="icon-btn" title="Close">✕</button>
                 </div>
             </header>
 
-            <section class="metrics" id="metrics"></section>
+            <div class="body">
+                <nav class="icon-rail">
+                    <button class="rail-btn active" data-view="contracts" title="Heists">
+                        <svg viewBox="0 0 24 24"><path d="M4 10h16M6 10v9h12v-9M12 3l9 7H3z"/></svg>
+                        <span>Heists</span>
+                    </button>
+                    <button class="rail-btn" data-view="shop" title="Market">
+                        <svg viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7zM9 7V5a3 3 0 0 1 6 0v2"/></svg>
+                        <span>Market</span>
+                    </button>
+                </nav>
 
-            <main>
-                <section class="detail">
-                    <div class="hero">
-                        <img id="heroImage" alt="" />
-                        <div class="hero-fade">
-                            <p class="hero-kicker" id="heroKicker">Select a contract</p>
-                            <h2 id="heroTitle">Choose a target</h2>
+                <main class="stage">
+                    <div id="viewContracts" class="view">
+                        <div class="stage-head">
+                            <div>
+                                <p class="eyebrow">SCENARIOS</p>
+                                <h1>Select a heist</h1>
+                            </div>
+                            <div class="filters" id="typeTabs"></div>
+                        </div>
+                        <div id="heistGrid" class="heist-grid"></div>
+                    </div>
+
+                    <div id="viewShop" class="view hidden">
+                        <div class="stage-head">
+                            <div>
+                                <p class="eyebrow" id="shopLabel">MARKET</p>
+                                <h1>Heist equipment</h1>
+                                <p class="desc" id="shopSub"></p>
+                            </div>
+                            <div class="balance">
+                                <span>BALANCE</span>
+                                <strong id="shopBalance">$0</strong>
+                            </div>
+                        </div>
+                        <div id="shopGrid" class="shop-grid"></div>
+                    </div>
+                </main>
+            </div>
+
+            <div id="lobby" class="lobby hidden">
+                <div class="lobby-panel">
+                    <div class="lobby-cover" id="lobbyCover">
+                        <button id="lobbyBack" class="back-btn">‹ BACK</button>
+                        <div class="lobby-cover-copy">
+                            <p id="heroKicker">HEIST</p>
+                            <h2 id="heroTitle">—</h2>
                         </div>
                     </div>
-                    <div class="detail-body">
-                        <p id="heroDesc" class="desc">Pick a job from the list to see the photo, kit, and crew size.</p>
-                        <div>
-                            <p class="section-label">Required items</p>
+                    <div class="lobby-body">
+                        <div class="lobby-col">
+                            <p id="heroDesc" class="desc"></p>
+                            <div class="stars" id="heroStars"></div>
+                            <div class="pills" id="detailMeta"></div>
+                            <p class="section-label">REQUIRED ITEMS</p>
                             <div id="itemRow" class="item-row"></div>
+                            <p class="section-label">INFO</p>
+                            <ol class="stages" id="stageList"></ol>
                         </div>
-                        <div class="detail-meta" id="detailMeta"></div>
-                        <div id="crewBox" class="crew-box">
-                            <p class="muted" id="crewEmpty">Select a target to form a crew.</p>
+                        <div class="lobby-col team-col">
+                            <p class="section-label">TEAM</p>
+                            <p class="muted" id="crewEmpty">Select this heist to form a lobby.</p>
                             <div id="crewBody" class="hidden">
-                                <p class="section-label">Crew</p>
                                 <ul id="memberList"></ul>
                                 <div id="nearbyList" class="nearby hidden"></div>
                                 <div class="actions">
-                                    <button id="inviteBtn" class="btn ghost">Invite nearby</button>
-                                    <button id="startBtn" class="btn primary">Start robbery</button>
-                                    <button id="leaveBtn" class="btn danger">Leave crew</button>
+                                    <button id="inviteBtn" class="btn ghost">INVITE</button>
+                                    <button id="startBtn" class="btn primary">START HEIST</button>
+                                    <button id="leaveBtn" class="btn danger">LEAVE</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </section>
-
-                <aside class="list-pane">
-                    <div class="list-head">
-                        <h3 id="listTitle">Targets</h3>
-                        <p id="listSub">No cops required</p>
-                    </div>
-                    <div id="locationList" class="target-list"></div>
-                </aside>
-            </main>
+                </div>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>

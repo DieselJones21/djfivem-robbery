@@ -71,11 +71,15 @@ local function interactionById(loc, id)
     end
 end
 
+local function isTruckType(typeId)
+    return typeId == 'moneytruck' or typeId == 'cargotruck'
+end
+
 local function allLootDone(job, loc)
     if loc.type == 'vehicle' then
         return job.stage == 'delivered'
     end
-    if loc.type == 'moneytruck' then
+    if isTruckType(loc.type) then
         local needed = loc.truck.lootSpots or 1
         local done = 0
         for id in pairs(job.completed) do
@@ -98,6 +102,7 @@ end
 function SerializeJob(job)
     if not job then return nil end
     local loc = GetRobberyLocation(job.locationId)
+    if not loc then return nil end
     return {
         id = job.id,
         locationId = job.locationId,
@@ -112,6 +117,9 @@ function SerializeJob(job)
         truckNetId = job.truckNetId,
         dropoff = loc.vehicle and Vec(loc.vehicle.dropoff) or nil,
         gps = Vec(loc.coords),
+        stages = loc.stages,
+        hasGuards = LocationHasGuards(loc) == true,
+        remaining = math.max(0, job.timeout - os.time()),
     }
 end
 
@@ -124,80 +132,6 @@ local function broadcastJob(job)
     end)
 end
 
-local function alertPolice(job, loc, interaction)
-    if not Config.Dispatch.enabled then return end
-    if interaction and interaction.alertsPolice == false then return end
-    if job.alerted then return end
-    job.alerted = true
-
-    local key = ('alert_%s'):format(loc.type)
-    local coords = loc.coords
-    local payload = {
-        type = loc.type,
-        label = loc.label,
-        coords = coords,
-        message = locale(key),
-        source = job.host,
-    }
-
-    if Config.Dispatch.resource == 'custom' and Config.Dispatch.custom then
-        Config.Dispatch.custom(payload)
-        return
-    end
-
-    if Config.Dispatch.resource == 'ps-dispatch' then
-        TriggerEvent('ps-dispatch:server:notify', {
-            dispatchCode = '10-90',
-            message = payload.message,
-            coords = coords,
-            description = loc.label,
-        })
-        return
-    end
-
-    if Config.Dispatch.resource == 'cd_dispatch' then
-        TriggerEvent('cd_dispatch:AddNotification', {
-            job_table = { 'police', 'sheriff', 'bcso' },
-            coords = coords,
-            title = payload.message,
-            message = loc.label,
-            flash = 0,
-            unique_id = tostring(job.id),
-            blip = {
-                sprite = 161,
-                scale = 1.2,
-                colour = 1,
-                flashes = false,
-                text = payload.message,
-                time = Config.Dispatch.blipTime * 1000,
-            },
-        })
-        return
-    end
-
-    if Config.Dispatch.resource == 'qs-dispatch' then
-        TriggerEvent('qs-dispatch:server:CreateDispatchCall', {
-            job = { 'police', 'sheriff', 'bcso' },
-            callLocation = coords,
-            callCode = { code = '10-90', snippet = payload.message },
-            message = loc.label,
-        })
-        return
-    end
-
-    local players = exports.qbx_core:GetQBPlayers()
-    for src in pairs(players) do
-        if IsOnDutyPolice(src) then
-            TriggerClientEvent('djfivem-robbery:client:policeAlert', src, {
-                coords = Vec(coords),
-                title = payload.message,
-                description = loc.label,
-                duration = Config.Dispatch.blipTime,
-            })
-        end
-    end
-end
-
 local function giveRewards(src, rewards, crew)
     if not rewards then return end
     local recipients = { src }
@@ -208,7 +142,7 @@ local function giveRewards(src, rewards, crew)
         end
     end
 
-    local share = #recipients
+    local share = math.max(1, #recipients)
     for i = 1, #rewards do
         local reward = rewards[i]
         if not reward.chance or math.random(100) <= reward.chance then
@@ -219,16 +153,26 @@ local function giveRewards(src, rewards, crew)
             for r = 1, #recipients do
                 local target = recipients[r]
                 if reward.type == 'account' then
-                    exports.qbx_core:AddMoney(target, reward.name or Config.CashAccount, amount, 'robbery-tablet')
+                    exports.qbx_core:AddMoney(target, reward.name or Config.CashAccount, amount, 'nexus-contract')
                 else
                     local added = exports.ox_inventory:AddItem(target, reward.name, amount)
                     if not added and reward.name == Config.Items.dirtyCash then
-                        exports.qbx_core:AddMoney(target, Config.CashAccount, amount, 'robbery-tablet-fallback')
+                        exports.qbx_core:AddMoney(target, Config.CashAccount, amount, 'nexus-contract-fallback')
                     end
                 end
             end
         end
     end
+end
+
+local function spawnGuardsFor(job, loc, reason)
+    if not LocationHasGuards(loc) then return end
+    if job.guardsSpawned then return end
+    local when = loc.guards.spawnOn or 'alarm'
+    if reason == 'start' and when ~= 'start' then return end
+    if reason == 'alarm' and when == 'start' and job.guardsSpawned then return end
+    job.guardsSpawned = true
+    TriggerClientEvent('djfivem-robbery:client:spawnGuards', job.host, job.id, loc.id)
 end
 
 function StartJob(src)
@@ -239,9 +183,10 @@ function StartJob(src)
 
     local loc = GetRobberyLocation(crew.locationId)
     if not loc then return false, 'invalid' end
+    if not IsTypeEnabled(loc.type) then return false, 'type_disabled' end
     local typeCfg = Config.Types[loc.type]
 
-    if CrewSize(crew) < typeCfg.minPlayers then
+    if CrewSize(crew) < (typeCfg.minPlayers or 1) then
         return false, 'min_players', typeCfg.minPlayers
     end
 
@@ -272,6 +217,9 @@ function StartJob(src)
         if IsOnDutyPolice(member) then
             return false, 'police_blocked'
         end
+        if IsDead(member) then
+            return false, 'crew_wiped'
+        end
     end
 
     for _, job in pairs(Jobs) do
@@ -281,6 +229,7 @@ function StartJob(src)
     end
 
     local jobId = nextJobId()
+    local timeout = GetLocationTimeout(loc)
     local job = {
         id = jobId,
         crewId = crew.id,
@@ -289,13 +238,16 @@ function StartJob(src)
         members = {},
         completed = {},
         busy = {},
+        tokens = {},
         stage = 'active',
         startedAt = os.time(),
-        timeout = os.time() + Config.JobTimeout,
+        timeout = os.time() + timeout,
         alerted = false,
         vehicleNetId = nil,
         truckNetId = nil,
         truckPeds = {},
+        guardsSpawned = false,
+        rearOpened = false,
     }
 
     for member in pairs(crew.members) do
@@ -317,9 +269,11 @@ function StartJob(src)
 
     if loc.type == 'vehicle' then
         TriggerClientEvent('djfivem-robbery:client:spawnVehicle', src, jobId, loc.id)
-    elseif loc.type == 'moneytruck' then
+    elseif isTruckType(loc.type) then
         TriggerClientEvent('djfivem-robbery:client:spawnTruck', src, jobId, loc.id)
     end
+
+    spawnGuardsFor(job, loc, 'start')
 
     SendWebhook('Contract started', ('%s started %s with %s player(s)'):format(
         CharacterName(src), loc.label, CrewSize(crew)
@@ -338,7 +292,7 @@ function FailJob(jobId, reason)
         Notify(src, reason or 'job_failed', 'error')
     end)
 
-    if loc and (loc.type == 'vehicle' or loc.type == 'moneytruck') then
+    if loc and (loc.type == 'vehicle' or isTruckType(loc.type) or LocationHasGuards(loc)) then
         EachCrewMember(crew or { members = job.members }, function(member)
             TriggerClientEvent('djfivem-robbery:client:cleanupEntities', member, jobId)
         end)
@@ -354,6 +308,7 @@ function CompleteJob(jobId)
     local job = Jobs[jobId]
     if not job then return end
     local crew = Crews[job.crewId]
+    local loc = GetRobberyLocation(job.locationId)
     local members = {}
     if crew then
         for src in pairs(crew.members) do
@@ -369,7 +324,11 @@ function CompleteJob(jobId)
     for i = 1, #members do
         TriggerClientEvent('djfivem-robbery:client:jobEnded', members[i], 'job_complete')
         Notify(members[i], 'job_complete', 'success')
+        TriggerClientEvent('djfivem-robbery:client:cleanupEntities', members[i], jobId)
     end
+    SendWebhook('Contract complete', ('%s finished %s'):format(
+        loc and loc.label or job.locationId, CharacterName(job.host)
+    ))
     if crew then
         for i = 1, #members do
             LeaveCrew(members[i], true)
@@ -378,14 +337,20 @@ function CompleteJob(jobId)
 end
 
 lib.callback.register('djfivem-robbery:server:beginInteraction', function(source, locationId, interactionId)
+    if not RateLimit(source, 'begin') then
+        return { ok = false, reason = 'rate_limited' }
+    end
     local crew = GetCrew(source)
     if not crew or not crew.jobId then return { ok = false, reason = 'not_in_crew' } end
     local job = Jobs[crew.jobId]
     if not job or job.locationId ~= locationId then
         return { ok = false, reason = 'not_in_crew' }
     end
+    if not job.members[source] then return { ok = false, reason = 'not_in_crew' } end
+    if IsDead(source) then return { ok = false, reason = 'job_failed' } end
 
     local loc = GetRobberyLocation(locationId)
+    if not loc then return { ok = false, reason = 'invalid' } end
     local interaction = interactionById(loc, interactionId)
     if not interaction then return { ok = false, reason = 'invalid' } end
 
@@ -411,34 +376,82 @@ lib.callback.register('djfivem-robbery:server:beginInteraction', function(source
         return { ok = false, reason = 'missing_item', item = ItemLabel(interaction.item) }
     end
 
+    local token = RandomToken()
     job.busy[interactionId] = source
+    job.tokens[interactionId] = {
+        src = source,
+        token = token,
+        expires = os.time() + (Config.AntiExploit.interactionTokenTtl or 90),
+    }
     broadcastJob(job)
-    return { ok = true, interaction = interaction }
+    return {
+        ok = true,
+        token = token,
+        interaction = {
+            id = interaction.id,
+            kind = interaction.kind,
+            label = interaction.label,
+            duration = interaction.duration,
+            minigame = interaction.minigame,
+            skill = interaction.skill,
+            anim = interaction.anim,
+        },
+    }
 end)
 
-lib.callback.register('djfivem-robbery:server:finishInteraction', function(source, locationId, interactionId, success)
+lib.callback.register('djfivem-robbery:server:finishInteraction', function(source, locationId, interactionId, success, token)
+    if not RateLimit(source, 'finish') then
+        return { ok = false, reason = 'rate_limited' }
+    end
     local crew = GetCrew(source)
     if not crew or not crew.jobId then return { ok = false } end
     local job = Jobs[crew.jobId]
     if not job or job.locationId ~= locationId then return { ok = false } end
     if job.busy[interactionId] ~= source then return { ok = false, reason = 'busy' } end
 
+    local lock = job.tokens[interactionId]
+    if not lock or lock.src ~= source or lock.token ~= token or os.time() > lock.expires then
+        job.busy[interactionId] = nil
+        job.tokens[interactionId] = nil
+        broadcastJob(job)
+        return { ok = false, reason = 'invalid_token' }
+    end
+
     local loc = GetRobberyLocation(locationId)
     local interaction = interactionById(loc, interactionId)
     job.busy[interactionId] = nil
+    job.tokens[interactionId] = nil
+
+    if not interaction then return { ok = false, reason = 'invalid' } end
+
+    if Config.AntiExploit.validateDistanceOnFinish and Distance(source, interaction.coords) > Config.InteractDistance + 2.5 then
+        broadcastJob(job)
+        return { ok = false, reason = 'too_far' }
+    end
 
     if not success then
         broadcastJob(job)
         return { ok = true, failed = true }
     end
 
-    if interaction.item then
+    if job.completed[interactionId] then
+        return { ok = false, reason = 'already_done' }
+    end
+
+    if Config.AntiExploit.requireItemOnFinish and interaction.item then
+        if not HasItem(source, interaction.item, 1) then
+            broadcastJob(job)
+            return { ok = false, reason = 'missing_item', item = ItemLabel(interaction.item) }
+        end
+        ConsumeItem(source, interaction.item, interaction.consumeChance or 0)
+    elseif interaction.item then
         ConsumeItem(source, interaction.item, interaction.consumeChance or 0)
     end
 
     job.completed[interactionId] = true
     if interaction.alertsPolice or interaction.kind == 'hack' or interaction.kind == 'breach' then
-        alertPolice(job, loc, interaction)
+        AlertPolice(job, loc, interaction)
+        spawnGuardsFor(job, loc, 'alarm')
     end
 
     if interaction.kind == 'breach' and loc.vaultDoor then
@@ -468,6 +481,9 @@ lib.callback.register('djfivem-robbery:server:finishInteraction', function(sourc
 end)
 
 lib.callback.register('djfivem-robbery:server:lockpickVehicle', function(source, jobId)
+    if not RateLimit(source, 'lockpick') then
+        return { ok = false, reason = 'rate_limited' }
+    end
     local job = Jobs[jobId]
     if not job or not job.members[source] then return { ok = false } end
     local loc = GetRobberyLocation(job.locationId)
@@ -480,13 +496,16 @@ lib.callback.register('djfivem-robbery:server:lockpickVehicle', function(source,
     if Distance(source, loc.vehicle.spawn) > 6.0 then
         return { ok = false, reason = 'too_far' }
     end
-    return { ok = true }
+    local token = RandomToken()
+    job.tokens.lockpick = { src = source, token = token, expires = os.time() + 90 }
+    return { ok = true, token = token }
 end)
 
 RegisterNetEvent('djfivem-robbery:server:vehicleReady', function(jobId, netId)
     local src = source
     local job = Jobs[jobId]
     if not job or job.host ~= src then return end
+    if type(netId) ~= 'number' then return end
     job.vehicleNetId = netId
     job.stage = 'spawned'
     broadcastJob(job)
@@ -494,15 +513,19 @@ RegisterNetEvent('djfivem-robbery:server:vehicleReady', function(jobId, netId)
     EachCrewMember(Crews[job.crewId], function(member)
         TriggerClientEvent('djfivem-robbery:client:bindVehicle', member, job.id, netId, loc.id)
     end)
-    alertPolice(job, loc, { alertsPolice = true })
+    AlertPolice(job, loc, { alertsPolice = true })
+    spawnGuardsFor(job, loc, 'alarm')
 end)
 
-RegisterNetEvent('djfivem-robbery:server:vehicleUnlocked', function(jobId)
+RegisterNetEvent('djfivem-robbery:server:vehicleUnlocked', function(jobId, token)
     local src = source
     local job = Jobs[jobId]
     if not job or not job.members[src] then return end
     if job.stage ~= 'spawned' then return end
-    ConsumeItem(src, Config.Items.lockpick, 40)
+    local lock = job.tokens.lockpick
+    if not lock or lock.src ~= src or lock.token ~= token or os.time() > lock.expires then return end
+    job.tokens.lockpick = nil
+    ConsumeItem(src, Config.Items.lockpick, 45)
     job.stage = 'stolen'
     job.completed.lockpick = true
     broadcastJob(job)
@@ -533,6 +556,7 @@ RegisterNetEvent('djfivem-robbery:server:truckReady', function(jobId, truckNet, 
     local src = source
     local job = Jobs[jobId]
     if not job or job.host ~= src then return end
+    if type(truckNet) ~= 'number' then return end
     job.truckNetId = truckNet
     job.truckPeds = pedNets or {}
     job.stage = 'spawned'
@@ -546,10 +570,20 @@ RegisterNetEvent('djfivem-robbery:server:truckReady', function(jobId, truckNet, 
 end)
 
 lib.callback.register('djfivem-robbery:server:lootTruck', function(source, jobId, crateId)
+    if not RateLimit(source, 'lootTruck') then
+        return { ok = false, reason = 'rate_limited' }
+    end
     local job = Jobs[jobId]
     if not job or not job.members[source] then return { ok = false } end
     local loc = GetRobberyLocation(job.locationId)
-    if loc.type ~= 'moneytruck' then return { ok = false } end
+    if not isTruckType(loc.type) then return { ok = false } end
+    if type(crateId) ~= 'string' or not crateId:find('^crate_%d+$') then
+        return { ok = false, reason = 'invalid' }
+    end
+    local crateNum = tonumber(crateId:match('%d+'))
+    if not crateNum or crateNum < 1 or crateNum > (loc.truck.lootSpots or 3) then
+        return { ok = false, reason = 'invalid' }
+    end
     if job.completed[crateId] then return { ok = false, reason = 'already_done' } end
     if job.busy[crateId] then return { ok = false, reason = 'busy' } end
 
@@ -559,6 +593,8 @@ lib.callback.register('djfivem-robbery:server:lootTruck', function(source, jobId
         if Distance(source, coords) > 8.0 then
             return { ok = false, reason = 'too_far' }
         end
+    else
+        return { ok = false, reason = 'too_far' }
     end
 
     if not job.rearOpened then
@@ -568,15 +604,24 @@ lib.callback.register('djfivem-robbery:server:lootTruck', function(source, jobId
         end
     end
 
+    local token = RandomToken()
     job.busy[crateId] = source
-    return { ok = true }
+    job.tokens[crateId] = { src = source, token = token, expires = os.time() + 90 }
+    return { ok = true, token = token }
 end)
 
-RegisterNetEvent('djfivem-robbery:server:finishTruckLoot', function(jobId, crateId, success)
+RegisterNetEvent('djfivem-robbery:server:finishTruckLoot', function(jobId, crateId, success, token)
     local src = source
     local job = Jobs[jobId]
     if not job or job.busy[crateId] ~= src then return end
+    local lock = job.tokens[crateId]
+    if not lock or lock.src ~= src or lock.token ~= token or os.time() > lock.expires then
+        job.busy[crateId] = nil
+        job.tokens[crateId] = nil
+        return
+    end
     job.busy[crateId] = nil
+    job.tokens[crateId] = nil
     if not success then
         broadcastJob(job)
         return
@@ -588,14 +633,29 @@ RegisterNetEvent('djfivem-robbery:server:finishTruckLoot', function(jobId, crate
         ConsumeItem(src, item, 100)
         job.rearOpened = true
     end
+    if job.completed[crateId] then return end
     job.completed[crateId] = true
-    alertPolice(job, loc, { alertsPolice = true })
+    AlertPolice(job, loc, { alertsPolice = true })
     giveRewards(src, loc.truck.loot, crew)
     Notify(src, 'truck_loot', 'success')
     broadcastJob(job)
     if allLootDone(job, loc) then
         CompleteJob(job.id)
     end
+end)
+
+RegisterNetEvent('djfivem-robbery:server:guardsReady', function(jobId, pedNets)
+    local src = source
+    local job = Jobs[jobId]
+    if not job or job.host ~= src then return end
+    job.guardNets = pedNets or {}
+    local crew = Crews[job.crewId]
+    EachCrewMember(crew, function(member)
+        if member ~= src then
+            TriggerClientEvent('djfivem-robbery:client:syncGuards', member, job.id, job.guardNets)
+        end
+        Notify(member, 'guards_spawned', 'error')
+    end)
 end)
 
 CreateThread(function()
@@ -605,16 +665,26 @@ CreateThread(function()
         for id, job in pairs(Jobs) do
             if now >= job.timeout then
                 FailJob(id, 'job_timeout')
-            elseif Config.FailIfCrewWiped then
-                local alive = false
-                for src in pairs(job.members) do
-                    if GetPlayer(src) and not IsDead(src) then
-                        alive = true
-                        break
+            else
+                for intId, lock in pairs(job.tokens) do
+                    if now > lock.expires then
+                        if job.busy[intId] == lock.src then
+                            job.busy[intId] = nil
+                        end
+                        job.tokens[intId] = nil
                     end
                 end
-                if not alive then
-                    FailJob(id, 'crew_wiped')
+                if Config.FailIfCrewWiped then
+                    local alive = false
+                    for src in pairs(job.members) do
+                        if GetPlayer(src) and not IsDead(src) then
+                            alive = true
+                            break
+                        end
+                    end
+                    if not alive then
+                        FailJob(id, 'crew_wiped')
+                    end
                 end
             end
         end
