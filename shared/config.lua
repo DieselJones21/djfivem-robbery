@@ -425,8 +425,8 @@ Config.Admin = {
 }
 
 Config.Ui = {
-    brand = 'NEXUS',
-    subtitle = 'Contract Network v2',
+    brand = 'HEIST PACK',
+    subtitle = '15 scenarios',
     showPoliceCount = true,
     showDifficulty = true,
 }

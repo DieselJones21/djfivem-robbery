@@ -3,9 +3,28 @@ const TYPE_ORDER = [
     'cargotruck', 'paleto', 'jewelry', 'train', 'yacht', 'cargoship', 'bobcat', 'pacific',
 ];
 
+const TYPE_LABELS = {
+    atm: 'ATM',
+    store: 'Store',
+    house: 'House',
+    vehicle: 'Vehicle',
+    ammunation: 'Ammu',
+    bank: 'Fleeca',
+    moneytruck: 'Money truck',
+    cargotruck: 'Cargo truck',
+    paleto: 'Paleto',
+    jewelry: 'Vangelico',
+    train: 'Train',
+    yacht: 'Yacht',
+    cargoship: 'Ship',
+    bobcat: 'Bobcat',
+    pacific: 'Pacific',
+};
+
 const app = document.getElementById('app');
 const typeTabs = document.getElementById('typeTabs');
-const locationList = document.getElementById('locationList');
+const heistGrid = document.getElementById('heistGrid');
+const lobby = document.getElementById('lobby');
 const hud = document.getElementById('hud');
 const minigame = document.getElementById('minigame');
 
@@ -17,11 +36,11 @@ let state = {
     police: 0,
     name: 'Operator',
     store: { enabled: false, items: [], balance: 0 },
-    selectedType: 'bank',
+    selectedType: 'all',
     selectedLocation: null,
     view: 'contracts',
-    brand: 'NEXUS',
-    subtitle: 'Contract Network v2',
+    brand: 'HEIST PACK',
+    subtitle: '15 scenarios',
 };
 
 let miniResolve = null;
@@ -63,12 +82,16 @@ function locationById(id) {
 }
 
 function selectedLocation() {
-    return locationById(state.selectedLocation) || state.locations.find((l) => l.type === state.selectedType);
+    return locationById(state.selectedLocation) || state.locations[0];
 }
 
 function stars(n) {
     n = Math.max(1, Math.min(5, n || 1));
     return '◆'.repeat(n) + '◇'.repeat(5 - n);
+}
+
+function shortLabel(label) {
+    return (label || '').replace('Heists', '').replace('Hits', '').replace('Robberies', '').replace('Theft', '').trim();
 }
 
 function setView(view) {
@@ -78,35 +101,61 @@ function setView(view) {
     });
     document.getElementById('viewContracts').classList.toggle('hidden', view !== 'contracts');
     document.getElementById('viewShop').classList.toggle('hidden', view !== 'shop');
-    document.getElementById('viewCrew').classList.toggle('hidden', view !== 'crew');
-    document.getElementById('viewEyebrow').textContent = view === 'shop' ? 'Black market' : view === 'crew' ? 'Lobby' : 'Available jobs';
-    document.getElementById('viewTitle').textContent = view === 'shop' ? 'Market' : view === 'crew' ? 'Crew' : 'Contracts';
-    typeTabs.style.display = view === 'contracts' ? 'flex' : 'none';
+    if (view !== 'contracts') lobby.classList.add('hidden');
 }
 
 function renderTabs() {
     const types = [...state.types].sort((a, b) => TYPE_ORDER.indexOf(a.id) - TYPE_ORDER.indexOf(b.id));
-    typeTabs.innerHTML = types.map((t) => `
-        <button class="tab ${state.selectedType === t.id ? 'active' : ''}" data-type="${t.id}">${t.label}</button>
-    `).join('');
+    typeTabs.innerHTML = [
+        `<button class="tab ${state.selectedType === 'all' ? 'active' : ''}" data-type="all">All</button>`,
+        ...types.map((t) => `
+            <button class="tab ${state.selectedType === t.id ? 'active' : ''}" data-type="${t.id}">${TYPE_LABELS[t.id] || shortLabel(t.label)}</button>
+        `),
+    ].join('');
     typeTabs.querySelectorAll('.tab').forEach((btn) => {
         btn.addEventListener('click', () => {
             state.selectedType = btn.dataset.type;
-            const first = state.locations.find((l) => l.type === state.selectedType);
-            if (!state.crew) state.selectedLocation = first ? first.id : null;
-            render();
+            renderHeistGrid();
+            renderTabs();
         });
     });
 }
 
-function renderDetail() {
+function renderHeistGrid() {
+    const rows = state.selectedType === 'all'
+        ? state.locations
+        : state.locations.filter((l) => l.type === state.selectedType);
+    heistGrid.innerHTML = rows.map((loc) => {
+        const selected = state.selectedLocation === loc.id ? 'selected' : '';
+        const onCd = (loc.cooldown || 0) > 0;
+        return `
+            <button class="heist-card ${selected}" data-id="${loc.id}">
+                <div class="heist-cover t-${loc.type}"></div>
+                ${onCd ? `<span class="badge lock">${formatCooldown(loc.cooldown)}</span>` : (loc.armed ? '<span class="badge armed">ARMED</span>' : '')}
+                <div class="heist-shade">
+                    <h3>${loc.label}</h3>
+                    <div class="heist-meta">
+                        <span>COPS <b>${loc.minPolice}</b></span>
+                        <span>TEAM <b>${loc.minPlayers || 1}-${loc.maxPlayers}</b></span>
+                        <span>PAY <b>${loc.payoutLabel}</b></span>
+                    </div>
+                </div>
+            </button>
+        `;
+    }).join('');
+    heistGrid.querySelectorAll('.heist-card').forEach((card) => {
+        card.addEventListener('click', () => openLobby(card.dataset.id));
+    });
+}
+
+function renderLobbyDetail() {
     const loc = selectedLocation();
-    const type = typeById(state.selectedType);
-    const art = document.getElementById('heroArt');
-    art.className = `hero-art d${loc?.difficulty || type?.difficulty || 1}`;
-    document.getElementById('heroKicker').textContent = type ? type.label : 'Contracts';
-    document.getElementById('heroTitle').textContent = loc ? loc.label : 'Choose a target';
-    document.getElementById('heroDesc').textContent = loc ? loc.description : (type ? type.description : '');
+    const type = loc && typeById(loc.type);
+    const cover = document.getElementById('lobbyCover');
+    cover.className = `lobby-cover t-${loc?.type || 'bank'}`;
+    document.getElementById('heroKicker').textContent = type ? type.label.toUpperCase() : 'HEIST';
+    document.getElementById('heroTitle').textContent = loc ? loc.label : 'Choose a heist';
+    document.getElementById('heroDesc').textContent = loc ? loc.description : '';
     document.getElementById('heroStars').textContent = stars(loc?.difficulty || type?.difficulty);
 
     const items = (loc && loc.requiredItems) || [];
@@ -117,10 +166,10 @@ function renderDetail() {
     if (loc) {
         const onCd = loc.cooldown > 0;
         document.getElementById('detailMeta').innerHTML = `
-            <span class="pill">Crew <em>${loc.minPlayers || 1}–${loc.maxPlayers}</em></span>
-            <span class="pill">PD <em>${loc.minPolice}</em></span>
-            <span class="pill">Payout <em>${loc.payoutLabel}</em></span>
-            <span class="pill">${onCd ? `Locked ${formatCooldown(loc.cooldown)}` : 'Available now'}</span>
+            <span class="pill">TEAM <em>${loc.minPlayers || 1}–${loc.maxPlayers}</em></span>
+            <span class="pill">COPS <em>${loc.minPolice}</em></span>
+            <span class="pill">PAYOUT <em>${loc.payoutLabel}</em></span>
+            <span class="pill">${onCd ? `LOCKED ${formatCooldown(loc.cooldown)}` : 'READY'}</span>
             ${loc.armed ? '<span class="pill warn">ARMED GUARDS</span>' : ''}
         `;
         document.getElementById('stageList').innerHTML = (loc.stages || []).map((s) => `<li>${s}</li>`).join('');
@@ -130,40 +179,19 @@ function renderDetail() {
     }
 }
 
-function renderLocations() {
-    const type = typeById(state.selectedType);
-    const rows = state.locations.filter((l) => l.type === state.selectedType);
-    document.getElementById('listTitle').textContent = type ? type.label : 'Targets';
-    document.getElementById('listSub').textContent = type
-        ? `${type.minPolice} PD · ${type.maxPlayers} max · ${formatCooldown(type.cooldown)}`
-        : 'Select a category';
-
-    locationList.innerHTML = rows.map((loc) => {
-        const selected = state.selectedLocation === loc.id ? 'selected' : '';
-        const onCd = (loc.cooldown || 0) > 0;
-        return `
-            <button class="target ${selected}" data-id="${loc.id}">
-                <span class="bar"></span>
-                <div>
-                    <h4>${loc.label}</h4>
-                    <p>${loc.payoutLabel} · ${stars(loc.difficulty)}</p>
-                    ${loc.armed ? '<p class="armed">ARMED</p>' : ''}
-                </div>
-                <p class="status ${onCd ? 'down' : ''}">${onCd ? formatCooldown(loc.cooldown) : 'Ready'}</p>
-            </button>
-        `;
-    }).join('');
-
-    locationList.querySelectorAll('.target').forEach((card) => {
-        card.addEventListener('click', async () => {
-            state.selectedLocation = card.dataset.id;
-            if (!state.crew) {
-                const result = await nui('createCrew', { locationId: state.selectedLocation });
-                if (result.ok) state.crew = result.crew;
-            }
-            render();
-        });
-    });
+async function openLobby(locationId) {
+    if (state.crew && state.crew.locationId !== locationId) {
+        locationId = state.crew.locationId;
+    }
+    state.selectedLocation = locationId;
+    const loc = locationById(locationId);
+    if (loc && state.selectedType !== 'all') state.selectedType = loc.type;
+    if (!state.crew) {
+        const result = await nui('createCrew', { locationId });
+        if (result.ok) state.crew = result.crew;
+    }
+    lobby.classList.remove('hidden');
+    render();
 }
 
 function renderCrew() {
@@ -177,18 +205,17 @@ function renderCrew() {
     }
     empty.classList.add('hidden');
     body.classList.remove('hidden');
-    const loc = locationById(crew.locationId);
     document.getElementById('memberList').innerHTML = crew.members.map((m) => `
         <li><span>${m.name}</span>${m.host ? '<span class="host">LEADER</span>' : ''}</li>
     `).join('');
     document.getElementById('inviteBtn').disabled = crew.members.length >= crew.maxPlayers;
-    document.getElementById('startBtn').textContent = loc ? `Start ${loc.label}` : 'Start contract';
-    if (loc && loc.type !== state.selectedType) state.selectedType = loc.type;
+    const loc = locationById(crew.locationId);
+    document.getElementById('startBtn').textContent = loc ? 'START HEIST' : 'START HEIST';
 }
 
 function renderShop() {
     const store = state.store || {};
-    document.getElementById('shopLabel').textContent = store.label || 'Nexus Supply';
+    document.getElementById('shopLabel').textContent = store.label || 'MARKET';
     document.getElementById('shopSub').textContent = store.subtitle || '';
     document.getElementById('shopBalance').textContent = money(store.balance);
     const grid = document.getElementById('shopGrid');
@@ -198,15 +225,16 @@ function renderShop() {
     }
     grid.innerHTML = (store.items || []).map((item) => `
         <article class="shop-card" data-item="${item.item}">
+            <div class="shop-icon">▣</div>
             <h4>${item.label}</h4>
             <p>${item.description}</p>
             <div class="shop-meta">
                 <span class="price">${money(item.price)}</span>
-                <span>${item.infinite ? 'In stock' : `${item.stock} left`}</span>
+                <span>${item.infinite ? 'IN STOCK' : `${item.stock} LEFT`}</span>
             </div>
             <div class="qty-row">
                 <input type="number" min="1" max="${store.maxQty || 10}" value="1" />
-                <button ${!item.infinite && item.stock < 1 ? 'disabled' : ''}>Buy</button>
+                <button ${!item.infinite && item.stock < 1 ? 'disabled' : ''}>BUY</button>
             </div>
         </article>
     `).join('');
@@ -223,29 +251,36 @@ function renderShop() {
 }
 
 function render() {
-    document.getElementById('brandName').textContent = state.brand || 'NEXUS';
-    document.getElementById('brandSub').textContent = state.subtitle || 'Contract Network v2';
+    document.getElementById('brandName').textContent = state.brand || 'HEIST PACK';
+    document.getElementById('brandSub').textContent = state.subtitle || '15 scenarios';
     document.getElementById('greeting').textContent = state.name || 'Operator';
     document.getElementById('pdCount').textContent = String(state.police || 0);
     document.getElementById('cooldownLabel').textContent = (state.playerCooldown || 0) > 0
         ? formatCooldown(state.playerCooldown)
         : 'Ready';
     renderTabs();
-    renderDetail();
-    renderLocations();
+    renderHeistGrid();
+    renderLobbyDetail();
     renderCrew();
     renderShop();
 }
 
 function applyPayload(payload, tab) {
-    const first = (payload.locations || []).find((l) => l.type === (payload.crew?.type || state.selectedType || 'bank'));
+    const first = (payload.locations || [])[0];
     state = {
         ...state,
         ...payload,
-        selectedType: payload?.crew?.type || state.selectedType || 'bank',
-        selectedLocation: payload?.crew?.locationId || first?.id || null,
+        selectedType: payload?.crew?.type || state.selectedType || 'all',
+        selectedLocation: payload?.crew?.locationId || state.selectedLocation || first?.id || null,
+        brand: payload?.brand || 'HEIST PACK',
+        subtitle: payload?.subtitle || '15 scenarios',
     };
-    setView(tab || state.view || 'contracts');
+    setView(tab === 'shop' ? 'shop' : (tab || state.view || 'contracts'));
+    if (payload?.crew?.locationId) {
+        lobby.classList.remove('hidden');
+        state.view = 'contracts';
+        setView('contracts');
+    }
     render();
 }
 
@@ -256,10 +291,15 @@ document.querySelectorAll('.rail-btn').forEach((btn) => {
     });
 });
 
+document.getElementById('lobbyBack').addEventListener('click', () => {
+    lobby.classList.add('hidden');
+});
+
 document.getElementById('closeBtn').addEventListener('click', () => {
     nui('close');
     if (!window.invokeNative) {
         app.classList.add('hidden');
+        lobby.classList.add('hidden');
         document.getElementById('nearbyList').classList.add('hidden');
         if (state.job) renderHud(state.job);
     }
@@ -268,6 +308,7 @@ document.getElementById('leaveBtn').addEventListener('click', async () => {
     await nui('leaveCrew');
     state.crew = null;
     document.getElementById('nearbyList').classList.add('hidden');
+    lobby.classList.add('hidden');
     const fresh = await nui('refresh');
     if (fresh.ok) Object.assign(state, fresh);
     render();
@@ -429,7 +470,7 @@ function renderHud(job) {
         return;
     }
     hud.classList.remove('hidden');
-    document.getElementById('hudTitle').textContent = job.label || 'Contract';
+    document.getElementById('hudTitle').textContent = job.label || 'Heist';
     document.getElementById('hudTime').textContent = job.remaining ? `${formatCooldown(job.remaining)} remaining` : 'Live';
     const completed = job.completed || {};
     const stages = job.stages || [];
@@ -451,6 +492,7 @@ window.addEventListener('message', (event) => {
     }
     if (action === 'close') {
         app.classList.add('hidden');
+        lobby.classList.add('hidden');
         document.getElementById('nearbyList').classList.add('hidden');
         if (state.job) renderHud(state.job);
     }
@@ -468,6 +510,10 @@ window.addEventListener('keydown', (e) => {
             closeMinigame(false);
             return;
         }
+        if (!lobby.classList.contains('hidden')) {
+            lobby.classList.add('hidden');
+            return;
+        }
         nui('close');
     }
 });
@@ -475,22 +521,31 @@ window.addEventListener('keydown', (e) => {
 function demoMode() {
     const types = TYPE_ORDER.map((id, i) => ({
         id,
-        label: id.replace(/^[a-z]/, (c) => c.toUpperCase()).replace('cargoship', 'Cargo ship').replace('moneytruck', 'Money trucks').replace('ammunation', 'Ammunation'),
-        description: 'Demo contract type',
+        label: TYPE_LABELS[id] || id,
+        description: 'Demo heist',
         maxPlayers: id === 'pacific' || id === 'bobcat' ? 6 : 4,
         minPlayers: 1,
-        minPolice: i,
+        minPolice: Math.min(6, i),
         cooldown: 1800,
         difficulty: Math.min(5, 1 + Math.floor(i / 3)),
-        color: '#f5c542',
         requiredItems: [],
     }));
-    const locations = [
-        { id: 'pacific_standard', type: 'pacific', label: 'Pacific Standard — Downtown', description: 'Multi-stage downtown vault: power, keypad, C4, trolleys, then run.', payoutLabel: '$180,000 – $320,000', minPolice: 6, maxPlayers: 6, minPlayers: 3, cooldown: 0, cooldownDuration: 4500, requiredItems: [{ name: 'hacking_laptop', count: 1, label: 'Hacking Laptop' }, { name: 'c4_charge', count: 1, label: 'C4 Charge' }], difficulty: 5, stages: ['Cut rooftop power', 'Hack inner keypad', 'C4 vault', 'Loot trolleys'], armed: true },
-        { id: 'vangelico_rockford', type: 'jewelry', label: 'Vangelico — Rockford Hills', description: 'Bypass gallery security, smash displays, thermite the office safe.', payoutLabel: '$55,000 – $110,000', minPolice: 4, maxPlayers: 5, minPlayers: 2, cooldown: 0, cooldownDuration: 3000, requiredItems: [{ name: 'electronickit', count: 1, label: 'Electronic Kit' }, { name: 'crowbar', count: 1, label: 'Crowbar' }], difficulty: 4, stages: ['Hack gallery alarm', 'Smash displays', 'Thermite office safe'], armed: true },
-        { id: 'bobcat_cypress', type: 'bobcat', label: 'Bobcat Security — Cypress Flats', description: 'Fight through the yard, hack the cage, C4 the vault.', payoutLabel: '$90,000 – $160,000', minPolice: 5, maxPlayers: 6, minPlayers: 3, cooldown: 120, cooldownDuration: 4200, requiredItems: [{ name: 'c4_charge', count: 1, label: 'C4 Charge' }], difficulty: 5, stages: ['Hack gate panel', 'C4 vault', 'Loot cages'], armed: true },
-        { id: 'fleeca_legion', type: 'bank', label: 'Fleeca — Legion Square', description: 'Hack the panel, burn the vault, then split the boxes.', payoutLabel: '$42,000 – $95,000', minPolice: 2, maxPlayers: 4, minPlayers: 1, cooldown: 0, cooldownDuration: 2400, requiredItems: [{ name: 'electronickit', count: 1, label: 'Electronic Kit' }, { name: 'thermite', count: 1, label: 'Thermite' }], difficulty: 3, stages: ['Hack keypad', 'Thermite vault', 'Loot deposit boxes'], armed: true },
-        { id: 'store_grove', type: 'store', label: 'LTD — Grove Street', description: 'Clean the tills, then drill the office safe.', payoutLabel: '$3,200 – $7,800', minPolice: 1, maxPlayers: 4, minPlayers: 1, cooldown: 0, cooldownDuration: 1320, requiredItems: [{ name: 'lockpick', count: 1, label: 'Lockpick' }, { name: 'drill', count: 1, label: 'Drill' }], difficulty: 2, stages: ['Empty registers', 'Drill office safe'], armed: false },
+    const samples = [
+        { id: 'atm_legion', type: 'atm', label: 'ATM — Legion Square', description: 'Drill a street cassette and grab the cash.', payoutLabel: '$1,400 – $2,800', minPolice: 0, maxPlayers: 2, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Drill', count: 1 }], difficulty: 1, stages: ['Drill cassette'], armed: false },
+        { id: 'store_grove', type: 'store', label: 'LTD — Grove Street', description: 'Clean the tills, then drill the office safe.', payoutLabel: '$3,200 – $7,800', minPolice: 1, maxPlayers: 4, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Lockpick', count: 1 }, { label: 'Drill', count: 1 }], difficulty: 2, stages: ['Empty registers', 'Drill office safe'], armed: false },
+        { id: 'house_grove', type: 'house', label: 'Grove bungalow', description: 'Quiet entry, search every room, leave fast.', payoutLabel: '$4,200 – $8,500', minPolice: 1, maxPlayers: 3, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Lockpick', count: 1 }], difficulty: 2, stages: ['Lockpick door', 'Search rooms'], armed: false },
+        { id: 'veh_sultan_city', type: 'vehicle', label: 'Sultan — La Mesa', description: 'Boost the marked car and dump it at the chop.', payoutLabel: '$7,000 – $11,000', minPolice: 1, maxPlayers: 2, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Lockpick', count: 1 }], difficulty: 2, stages: ['Lockpick', 'Deliver'], armed: false },
+        { id: 'ammu_pillbox', type: 'ammunation', label: 'Ammunation — Pillbox', description: 'Kill cameras, smash cases, drill the locker.', payoutLabel: 'Guns + cash', minPolice: 2, maxPlayers: 4, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Electronic Kit', count: 1 }], difficulty: 3, stages: ['Hack', 'Smash', 'Locker'], armed: true },
+        { id: 'fleeca_legion', type: 'bank', label: 'Fleeca — Legion Square', description: 'Hack the panel, burn the vault, split the boxes.', payoutLabel: '$42,000 – $95,000', minPolice: 2, maxPlayers: 4, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Electronic Kit', count: 1 }, { label: 'Thermite', count: 1 }], difficulty: 3, stages: ['Hack keypad', 'Thermite vault', 'Loot boxes'], armed: true },
+        { id: 'truck_city', type: 'moneytruck', label: 'Gruppe Sechs — Legion', description: 'Stop the Stockade, drop the guards, thermite the rear.', payoutLabel: '$34,000 – $58,000', minPolice: 3, maxPlayers: 4, minPlayers: 2, cooldown: 0, requiredItems: [{ label: 'Thermite', count: 1 }], difficulty: 3, stages: ['Intercept', 'Loot crates'], armed: true },
+        { id: 'cargo_docks', type: 'cargotruck', label: 'Sealed mule — Elysian', description: 'Hijack the freight mule and crack the container.', payoutLabel: '$18,000 – $32,000', minPolice: 2, maxPlayers: 4, minPlayers: 1, cooldown: 0, requiredItems: [{ label: 'Crowbar', count: 1 }], difficulty: 3, stages: ['Stop mule', 'Crack crate'], armed: true },
+        { id: 'paleto_savings', type: 'paleto', label: 'Paleto Savings', description: 'Cut power, thermite the vault, fight county security.', payoutLabel: '$70,000 – $140,000', minPolice: 4, maxPlayers: 5, minPlayers: 2, cooldown: 0, requiredItems: [{ label: 'Electronic Kit', count: 1 }], difficulty: 4, stages: ['Cut power', 'Vault', 'Loot'], armed: true },
+        { id: 'vangelico_rockford', type: 'jewelry', label: 'Vangelico — Rockford', description: 'Bypass gallery security, smash displays, thermite the safe.', payoutLabel: '$55,000 – $110,000', minPolice: 4, maxPlayers: 5, minPlayers: 2, cooldown: 0, requiredItems: [{ label: 'Electronic Kit', count: 1 }, { label: 'Crowbar', count: 1 }], difficulty: 4, stages: ['Hack alarm', 'Smash cases', 'Office safe'], armed: true },
+        { id: 'train_quartz', type: 'train', label: 'Davis Quartz freight', description: 'Board the freight, drop car guards, grind the cash car.', payoutLabel: '$40,000 – $78,000', minPolice: 4, maxPlayers: 5, minPlayers: 2, cooldown: 0, requiredItems: [{ label: 'Crowbar', count: 1 }], difficulty: 4, stages: ['Crowbar car', 'Drill cash car'], armed: true },
+        { id: 'yacht_aquarius', type: 'yacht', label: 'Aquarius yacht', description: 'Board the yacht, clear the crew, loot cabins and the safe.', payoutLabel: '$48,000 – $95,000', minPolice: 4, maxPlayers: 5, minPlayers: 2, cooldown: 0, requiredItems: [{ label: 'Lockpick', count: 1 }], difficulty: 4, stages: ['Board', 'Hack bridge', 'Safe'], armed: true },
+        { id: 'ship_elysian', type: 'cargoship', label: 'Elysian freighter', description: 'Hack the container mainframe and lift sealed crates.', payoutLabel: '$55,000 – $105,000', minPolice: 4, maxPlayers: 6, minPlayers: 2, cooldown: 0, requiredItems: [{ label: 'Hacking Laptop', count: 1 }], difficulty: 4, stages: ['Hack mainframe', 'Loot crates'], armed: true },
+        { id: 'bobcat_cypress', type: 'bobcat', label: 'Bobcat Security', description: 'Fight the yard, plant C4, empty the cages.', payoutLabel: '$90,000 – $160,000', minPolice: 5, maxPlayers: 6, minPlayers: 3, cooldown: 120, requiredItems: [{ label: 'C4 Charge', count: 1 }], difficulty: 5, stages: ['Hack gate', 'C4 vault', 'Loot cages'], armed: true },
+        { id: 'pacific_standard', type: 'pacific', label: 'Pacific Standard', description: 'Kill rooftop power, crack the pad, C4 the vault, empty trolleys.', payoutLabel: '$180,000 – $320,000', minPolice: 6, maxPlayers: 6, minPlayers: 3, cooldown: 0, requiredItems: [{ label: 'Hacking Laptop', count: 1 }, { label: 'C4 Charge', count: 1 }], difficulty: 5, stages: ['Cut power', 'Hack keypad', 'C4 vault', 'Loot trolleys'], armed: true },
     ];
     applyPayload({
         ok: true,
@@ -498,29 +553,29 @@ function demoMode() {
         police: 4,
         playerCooldown: 0,
         types,
-        locations,
+        locations: samples,
         crew: null,
         store: {
             enabled: true,
-            label: 'Nexus Supply',
-            subtitle: 'Untraceable kit. Cash only. No receipts.',
+            label: 'MARKET',
+            subtitle: 'Buy kit before you start a scenario.',
             balance: 12450,
             maxQty: 10,
             items: [
                 { item: 'lockpick', label: 'Lockpick', description: 'Tills, house doors, and boost cars.', price: 250, infinite: true, stock: 999 },
-                { item: 'thermite', label: 'Thermite Charge', description: 'Vault doors and armored truck plating.', price: 3600, infinite: false, stock: 10 },
-                { item: 'c4_charge', label: 'C4 Charge', description: 'Pacific vault and Bobcat cage doors.', price: 5200, infinite: false, stock: 6 },
-                { item: 'hacking_laptop', label: 'Hacking Laptop', description: 'Required for Pacific and cargo-ship mainframes.', price: 4200, infinite: false, stock: 8 },
-                { item: 'drill', label: 'Industrial Drill', description: 'ATMs, safes, lockers, freight seals.', price: 2800, infinite: true, stock: 999 },
-                { item: 'robbery_tablet', label: 'Crime Tablet', description: 'Opens the Nexus contract network.', price: 8500, infinite: false, stock: 4 },
+                { item: 'thermite', label: 'Thermite', description: 'Vault doors and armored plating.', price: 3600, infinite: false, stock: 10 },
+                { item: 'c4_charge', label: 'C4 Charge', description: 'Pacific vault and Bobcat cages.', price: 5200, infinite: false, stock: 6 },
+                { item: 'hacking_laptop', label: 'Laptop', description: 'Pacific and cargo-ship mainframes.', price: 4200, infinite: false, stock: 8 },
+                { item: 'drill', label: 'Drill', description: 'ATMs, safes, lockers, freight seals.', price: 2800, infinite: true, stock: 999 },
+                { item: 'robbery_tablet', label: 'Tablet', description: 'Opens the heist pack.', price: 8500, infinite: false, stock: 4 },
             ],
         },
-        brand: 'NEXUS',
-        subtitle: 'Contract Network v2',
+        brand: 'HEIST PACK',
+        subtitle: '15 scenarios',
     }, 'contracts');
     app.classList.remove('hidden');
     state.job = {
-        label: 'Pacific Standard — Downtown',
+        label: 'Pacific Standard',
         remaining: 1420,
         stages: ['Cut rooftop power', 'Hack inner keypad', 'C4 vault', 'Loot trolleys'],
         completed: { power: true },
